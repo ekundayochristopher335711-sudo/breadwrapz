@@ -265,12 +265,10 @@ function App() {
 
       setOrderId(data.order.orderId);
       setOrderReference(data.order.reference);
-      setPaymentMessage(`Order created: ${data.order.orderId}. Opened Paystack checkout in a new tab.`);
       setCart([]);
-      setActivePage('track');
 
       if (data.paystack.authorization_url) {
-        window.open(data.paystack.authorization_url, '_blank');
+        window.location.href = data.paystack.authorization_url;
       }
     } catch (error) {
       console.error(error);
