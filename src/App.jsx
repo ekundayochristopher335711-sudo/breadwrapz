@@ -235,11 +235,6 @@ function App() {
       return;
     }
 
-    if (!orderEmailOrPhone.trim()) {
-      alert('Please enter your email or phone before checkout.');
-      return;
-    }
-
     if (cart.length === 0) {
       alert('Your cart is empty. Add an item before checkout.');
       return;
@@ -252,8 +247,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: orderEmailOrPhone.trim().includes('@') ? orderEmailOrPhone.trim() : undefined,
-          contact: orderEmailOrPhone.trim(),
+          contact: customerPhone.trim(),
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           amount: total,
