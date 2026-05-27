@@ -1,7 +1,32 @@
 import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
+import { Resend } from 'resend';
 import { createOrder, getOrder, getOrderByReference, updateOrder } from '../data/orderStore.js';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const OWNER_EMAIL = 'arlotechweb@gmail.com';
+
+async function notifyOwnerNewOrder(order) {
+  if (!process.env.RESEND_API_KEY) return;
+  const itemList = (order.items || []).map(i => `• ${i.name} — ₦${Number(i.price).toLocaleString()}`).join('\n');
+  await resend.emails.send({
+    from: 'Breadwrapz Orders <onboarding@resend.dev>',
+    to: OWNER_EMAIL,
+    subject: `New Order ${order.orderId} — ₦${Number(order.amount).toLocaleString()}`,
+    text: `New order received!\n\nOrder ID: ${order.orderId}\nCustomer: ${order.customerName || 'N/A'}\nPhone: ${order.customerPhone || order.contact}\nDelivery: ${order.deliveryLocation}\n\nItems:\n${itemList}\n\nTotal: ₦${Number(order.amount).toLocaleString()}\n\nStatus: ${order.status}`,
+  }).catch(err => console.error('Email error:', err));
+}
+
+async function notifyOwnerPaymentConfirmed(order) {
+  if (!process.env.RESEND_API_KEY) return;
+  await resend.emails.send({
+    from: 'Breadwrapz Orders <onboarding@resend.dev>',
+    to: OWNER_EMAIL,
+    subject: `✅ Payment Confirmed — ${order.orderId}`,
+    text: `Payment confirmed for order ${order.orderId}.\n\nCustomer: ${order.customerName || 'N/A'}\nPhone: ${order.customerPhone || order.contact}\nDelivery: ${order.deliveryLocation}\nTotal: ₦${Number(order.amount).toLocaleString()}\n\nYou can now prepare this order.`,
+  }).catch(err => console.error('Email error:', err));
+}
 
 const router = express.Router();
 
@@ -51,6 +76,8 @@ router.post('/initialize-payment', async (req, res) => {
         },
       }
     );
+
+    notifyOwnerNewOrder(order);
 
     return res.json({
       order,
@@ -154,6 +181,7 @@ router.post('/webhook', async (req, res) => {
         paymentVerified: true,
       });
       console.log(`Webhook: order ${order.orderId} confirmed via Paystack.`);
+      notifyOwnerPaymentConfirmed(order);
     }
   }
 
