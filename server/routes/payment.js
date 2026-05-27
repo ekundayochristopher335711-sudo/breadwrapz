@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 import { createOrder, getOrder, getOrderByReference, updateOrder } from '../data/orderStore.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const OWNER_EMAIL = 'arlotechweb@gmail.com';
+const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
 
 async function notifyOwnerNewOrder(order) {
   if (!process.env.RESEND_API_KEY) return;
