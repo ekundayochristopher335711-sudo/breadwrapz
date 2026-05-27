@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: breadwrapz-api
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_WEBHOOK_SECRET
+        sync: false
+      - key: PAYSTACK_CALLBACK_URL
+        value: https://breadwrapz.netlify.app/
