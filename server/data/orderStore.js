@@ -61,3 +61,8 @@ export async function updateOrder(orderId, updates) {
   await saveOrders();
   return orders[index];
 }
+
+export async function getAllOrders() {
+  const list = await loadOrders();
+  return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}

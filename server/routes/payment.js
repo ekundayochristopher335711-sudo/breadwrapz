@@ -2,7 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
 import { Resend } from 'resend';
-import { createOrder, getOrder, getOrderByReference, updateOrder } from '../data/orderStore.js';
+import { createOrder, getOrder, getOrderByReference, updateOrder, getAllOrders } from '../data/orderStore.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
@@ -151,6 +151,31 @@ router.get('/track-order/:orderId', async (req, res) => {
     console.error(error.message || error);
     return res.status(500).json({ error: 'Failed to fetch order status.' });
   }
+});
+
+router.get('/admin/orders', async (req, res) => {
+  const key = req.headers['x-admin-key'];
+  if (!key || key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  const orders = await getAllOrders();
+  return res.json(orders);
+});
+
+router.post('/admin/orders/:orderId/status', async (req, res) => {
+  const key = req.headers['x-admin-key'];
+  if (!key || key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  const { orderId } = req.params;
+  const { status } = req.body;
+  const validStatuses = ['Order Received', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status', validStatuses });
+  }
+  const updated = await updateOrder(orderId, { status });
+  if (!updated) return res.status(404).json({ error: 'Order not found' });
+  return res.json(updated);
 });
 
 router.post('/webhook', async (req, res) => {
