@@ -1,11 +1,27 @@
 import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { Resend } from 'resend';
 import { createOrder, getOrder, getOrderByReference, updateOrder, getAllOrders } from '../data/orderStore.js';
+import { calculateTotal } from '../data/menuPrices.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
+const MAX_ORDER_AMOUNT = 500000; // ₦500,000 hard cap per order
+
+function adminKeyValid(provided) {
+  const expected = process.env.ADMIN_KEY;
+  if (!provided || !expected) return false;
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 async function notifyOwnerNewOrder(order) {
   if (!process.env.RESEND_API_KEY) return;
@@ -30,17 +46,49 @@ async function notifyOwnerPaymentConfirmed(order) {
 
 const router = express.Router();
 
-router.post('/initialize-payment', async (req, res) => {
-  try {
-    const { email, amount, items, deliveryLocation, contact, customerName, customerPhone } = req.body;
-    const normalizedEmail = email?.trim().toLowerCase() || `customer+${Date.now()}@breadwrapz.com`;
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many checkout attempts. Please wait 15 minutes and try again.' },
+});
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Amount is required and must be greater than zero.' });
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait and try again.' },
+});
+
+router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
+  try {
+    const { email, items, deliveryLocation, contact, customerName, customerPhone } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Cart is empty.' });
     }
 
+    if (!deliveryLocation?.trim()) {
+      return res.status(400).json({ error: 'Delivery location is required.' });
+    }
+
+    // Always calculate amount server-side — never trust client amount
+    const amount = calculateTotal(items);
+
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'Order total must be greater than zero.' });
+    }
+
+    if (amount > MAX_ORDER_AMOUNT) {
+      return res.status(400).json({ error: 'Order total exceeds maximum allowed amount.' });
+    }
+
+    const normalizedEmail = email?.trim().toLowerCase() || `customer+${Date.now()}@breadwrapz.com`;
     const orderId = `BRD-${Date.now()}`;
     const reference = orderId;
+
     const order = await createOrder({
       orderId,
       reference,
@@ -50,7 +98,7 @@ router.post('/initialize-payment', async (req, res) => {
       customerPhone,
       amount,
       items,
-      deliveryLocation,
+      deliveryLocation: deliveryLocation.trim(),
       status: 'Order Received',
       createdAt: new Date().toISOString(),
     });
@@ -61,13 +109,8 @@ router.post('/initialize-payment', async (req, res) => {
         email: normalizedEmail,
         amount: Math.round(amount * 100),
         reference,
-        callback_url: process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:5173/',
-        metadata: {
-          orderId,
-          contact,
-          deliveryLocation,
-          items,
-        },
+        callback_url: process.env.PAYSTACK_CALLBACK_URL || 'https://breadwrapz.netlify.app/',
+        metadata: { orderId, contact, deliveryLocation, items },
       },
       {
         headers: {
@@ -80,33 +123,26 @@ router.post('/initialize-payment', async (req, res) => {
     notifyOwnerNewOrder(order);
 
     return res.json({
-      order,
+      order: { orderId: order.orderId, reference: order.reference, amount: order.amount, status: order.status },
       paystack: response.data.data,
     });
   } catch (error) {
-    console.error(error.response?.data || error.message || error);
-    return res.status(500).json({
-      error: 'Payment initialization failed',
-      details: error.response?.data || error.message,
-    });
+    console.error('initialize-payment error:', error.response?.data || error.message);
+    return res.status(500).json({ error: 'Payment initialization failed. Please try again.' });
   }
 });
 
-router.post('/verify-payment', async (req, res) => {
+router.post('/verify-payment', verifyLimiter, async (req, res) => {
   try {
     const { reference } = req.body;
 
-    if (!reference) {
+    if (!reference || typeof reference !== 'string') {
       return res.status(400).json({ error: 'Reference is required.' });
     }
 
     const response = await axios.get(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
     );
 
     const paymentData = response.data.data;
@@ -120,16 +156,20 @@ router.post('/verify-payment', async (req, res) => {
       });
     }
 
+    const updatedOrder = order ? await getOrder(order.orderId) : null;
     return res.json({
-      paymentData,
-      order: order ? await getOrder(order.orderId) : null,
+      paymentData: { status: paymentData.status },
+      order: updatedOrder ? {
+        orderId: updatedOrder.orderId,
+        status: updatedOrder.status,
+        amount: updatedOrder.amount,
+        items: updatedOrder.items,
+        createdAt: updatedOrder.createdAt,
+      } : null,
     });
   } catch (error) {
-    console.error(error.response?.data || error.message || error);
-    return res.status(500).json({
-      error: 'Payment verification failed',
-      details: error.response?.data || error.message,
-    });
+    console.error('verify-payment error:', error.response?.data || error.message);
+    return res.status(500).json({ error: 'Payment verification failed. Please try again.' });
   }
 });
 
@@ -137,25 +177,33 @@ router.get('/track-order/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    if (!orderId) {
+    if (!orderId || typeof orderId !== 'string') {
       return res.status(400).json({ error: 'Order ID is required.' });
     }
 
-    const order = await getOrder(orderId);
+    const order = await getOrder(orderId.trim().toUpperCase());
     if (!order) {
       return res.status(404).json({ error: 'Order not found.' });
     }
 
-    return res.json(order);
+    // Return only public-safe fields — no email or private contact info
+    return res.json({
+      orderId: order.orderId,
+      status: order.status,
+      amount: order.amount,
+      items: order.items,
+      deliveryLocation: order.deliveryLocation,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+    });
   } catch (error) {
-    console.error(error.message || error);
+    console.error('track-order error:', error.message);
     return res.status(500).json({ error: 'Failed to fetch order status.' });
   }
 });
 
 router.get('/admin/orders', async (req, res) => {
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== process.env.ADMIN_KEY) {
+  if (!adminKeyValid(req.headers['x-admin-key'])) {
     return res.status(401).json({ error: 'Unauthorised' });
   }
   const orders = await getAllOrders();
@@ -163,37 +211,32 @@ router.get('/admin/orders', async (req, res) => {
 });
 
 router.post('/admin/orders/:orderId/status', async (req, res) => {
-  const key = req.headers['x-admin-key'];
-  if (!key || key !== process.env.ADMIN_KEY) {
+  if (!adminKeyValid(req.headers['x-admin-key'])) {
     return res.status(401).json({ error: 'Unauthorised' });
   }
   const { orderId } = req.params;
   const { status } = req.body;
   const validStatuses = ['Order Received', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'];
   if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status', validStatuses });
+    return res.status(400).json({ error: 'Invalid status.', validStatuses });
   }
   const updated = await updateOrder(orderId, { status });
-  if (!updated) return res.status(404).json({ error: 'Order not found' });
+  if (!updated) return res.status(404).json({ error: 'Order not found.' });
   return res.json(updated);
 });
 
 router.post('/webhook', async (req, res) => {
   const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('PAYSTACK_WEBHOOK_SECRET not set — webhook ignored.');
+    console.error('PAYSTACK_WEBHOOK_SECRET not set — webhook rejected.');
     return res.sendStatus(200);
   }
 
   const signature = req.headers['x-paystack-signature'];
-  const hash = crypto
-    .createHmac('sha512', secret)
-    .update(req.rawBody)
-    .digest('hex');
+  if (!signature) return res.status(400).send('Missing signature');
 
-  if (hash !== signature) {
-    return res.status(400).send('Invalid signature');
-  }
+  const hash = crypto.createHmac('sha512', secret).update(req.rawBody).digest('hex');
+  if (hash !== signature) return res.status(400).send('Invalid signature');
 
   const event = req.body;
 
@@ -201,11 +244,8 @@ router.post('/webhook', async (req, res) => {
     const { reference } = event.data;
     const order = await getOrderByReference(reference);
     if (order) {
-      await updateOrder(order.orderId, {
-        status: 'Confirmed',
-        paymentVerified: true,
-      });
-      console.log(`Webhook: order ${order.orderId} confirmed via Paystack.`);
+      await updateOrder(order.orderId, { status: 'Confirmed', paymentVerified: true });
+      console.log(`Webhook: order ${order.orderId} confirmed.`);
       notifyOwnerPaymentConfirmed(order);
     }
   }
