@@ -5,6 +5,14 @@ import { menuDataNoImages } from './menuData.js';
 import Footer from './components/Footer.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
+const DELIVERY_FEE = 500;
+
+function calcPaystackFee(amount) {
+  if (amount <= 0) return 0;
+  let fee = Math.ceil(amount * 0.015);
+  if (amount > 2500) fee += 100;
+  return Math.min(fee, 2000);
+}
 
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,7 +137,9 @@ function App() {
     );
   }, [searchTerm, selectedCategory]);
 
-  const total = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
+  const paystackFee = useMemo(() => calcPaystackFee(subtotal + DELIVERY_FEE), [subtotal]);
+  const total = useMemo(() => subtotal + DELIVERY_FEE + paystackFee, [subtotal, paystackFee]);
 
   useEffect(() => {
     try {
@@ -681,9 +691,23 @@ function App() {
                       <span className="font-black text-brand-orange">₦{item.price.toLocaleString()}</span>
                     </div>
                   ))}
-                  <div className="pt-6 flex justify-between text-3xl font-black text-gray-900 dark:text-white">
-                    <span>Total</span>
-                    <span className="text-brand-orange">₦{total.toLocaleString()}</span>
+                  <div className="pt-4 space-y-2 border-t border-gray-100">
+                    <div className="flex justify-between text-gray-600 text-sm">
+                      <span>Subtotal</span>
+                      <span>₦{subtotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 text-sm">
+                      <span>Delivery fee</span>
+                      <span>₦{DELIVERY_FEE.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-500 text-sm">
+                      <span>Paystack fee</span>
+                      <span>₦{paystackFee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-3xl font-black text-gray-900 pt-2 border-t border-gray-200">
+                      <span>Total</span>
+                      <span className="text-brand-orange">₦{total.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               )}

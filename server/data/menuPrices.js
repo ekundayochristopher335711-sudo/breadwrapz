@@ -1,3 +1,12 @@
+export const DELIVERY_FEE = 500;
+
+export function calculatePaystackFee(amount) {
+  if (amount <= 0) return 0;
+  let fee = Math.ceil(amount * 0.015);
+  if (amount > 2500) fee += 100;
+  return Math.min(fee, 2000);
+}
+
 // Authoritative server-side price list — never trust prices from the client
 export const MENU_PRICES = {
   1:  300,    // Amala
@@ -28,8 +37,8 @@ export const MENU_PRICES = {
 
 export function calculateTotal(items) {
   if (!Array.isArray(items) || items.length === 0) return 0;
-  return items.reduce((sum, item) => {
-    const price = MENU_PRICES[item.id] ?? 0;
-    return sum + price;
-  }, 0);
+  const subtotal = items.reduce((sum, item) => sum + (MENU_PRICES[item.id] ?? 0), 0);
+  const withDelivery = subtotal + DELIVERY_FEE;
+  const paystackFee = calculatePaystackFee(withDelivery);
+  return withDelivery + paystackFee;
 }
