@@ -313,22 +313,17 @@ function App() {
         <div className="absolute top-2/3 left-2/3 w-10 h-10 border border-brand-orange/20 dark:border-brand-orange-dark/10 rounded-full blur-sm animate-float"></div>
       </div>
       {displayNavbar && (
-        <nav ref={navRef} className="fixed top-0 w-full z-50 glass mx-2 sm:mx-4 mt-0 rounded-b-2xl border-b border-white/10">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 py-1 sm:py-1 px-2 sm:px-3">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => scrollTo(homeRef)}>
-              <img
-                src="/images/logo.png"
-                alt="Breadwrapz Logo"
-                className="h-20 w-20 sm:h-28 sm:w-28 md:h-40 md:w-40 object-contain -mt-3"
-              />
-            </div>
-          </div>
+        <nav ref={navRef} className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
 
-          {/* Center: Search Bar (keeps navbar sticky) */}
-          <div className="flex-1 flex justify-center">
-            <div className="relative hidden sm:block w-full max-w-md">
+            {/* Logo */}
+            <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => { setActivePage('home'); scrollTo(homeRef); }}>
+              <img src="/images/logo.png" alt="Breadwrapz" className="h-10 w-10 object-contain" />
+              <span className="font-black text-gray-900 text-base hidden sm:block tracking-tight">BREADWRAPZ</span>
+            </div>
+
+            {/* Desktop Search */}
+            <div className="relative hidden md:block flex-1 max-w-sm mx-6">
               <input
                 type="text"
                 placeholder="Search for food..."
@@ -336,129 +331,87 @@ function App() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => searchTerm && setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                className="w-full px-3 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:border-brand-orange transition-all duration-300"
+                className="w-full pl-4 pr-10 py-2 rounded-full border border-gray-300 bg-gray-50 text-gray-900 text-sm focus:outline-none focus:border-brand-orange transition"
               />
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                🔍
-              </div>
-
-              {/* Search Suggestions */}
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                  {searchSuggestions.map((suggestion, index) => (
-                    <div
-                      key={index}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-gray-900 border-b border-gray-200 last:border-b-0"
-                      onClick={() => {
-                        setSearchTerm(suggestion);
-                        setShowSuggestions(false);
-                      }}
-                    >
-                      {suggestion}
+                <div className="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  {searchSuggestions.map((s, i) => (
+                    <div key={i} className="px-4 py-3 hover:bg-orange-50 cursor-pointer text-sm text-gray-800 border-b border-gray-100 last:border-0"
+                      onMouseDown={() => { setSearchTerm(s); setShowSuggestions(false); }}>
+                      {s}
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Right: Desktop Navigation & Mobile Controls */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-4 font-black text-sm uppercase tracking-widest">
-              <button onClick={() => setActivePage('home')} className="hover:text-brand-orange transition">Home</button>
-              <button onClick={() => setActivePage('menu')} className="hover:text-brand-orange transition">Menu</button>
-              <button onClick={() => setActivePage('location')} className="hover:text-brand-orange transition">Location</button>
-              <button onClick={() => setActivePage('track')} className="hover:text-brand-orange transition">Track</button>
-              <button onClick={() => setActivePage('cart')} className="bg-brand-orange text-white px-4 py-2 rounded-full font-black hover:bg-brand-orange-dark transition">
-                Cart ({cart.length})
+            {/* Desktop Nav Links */}
+            <div className="hidden md:flex items-center gap-1">
+              {['home','menu','location','track'].map(page => (
+                <button key={page} onClick={() => setActivePage(page)}
+                  className={`px-3 py-2 rounded-lg text-sm font-bold uppercase tracking-wide transition ${activePage === page ? 'text-brand-orange' : 'text-gray-700 hover:text-brand-orange'}`}>
+                  {page}
+                </button>
+              ))}
+              <button onClick={() => setActivePage('cart')}
+                className="ml-2 flex items-center gap-1.5 bg-brand-orange text-white px-4 py-2 rounded-full text-sm font-black hover:bg-brand-orange-dark transition">
+                🛒 Cart {cart.length > 0 && <span className="bg-white text-brand-orange rounded-full w-5 h-5 flex items-center justify-center text-xs font-black">{cart.length}</span>}
               </button>
             </div>
 
-            <div className="md:hidden flex items-center gap-4">
-              <button onClick={() => setActivePage('cart')} className="bg-brand-orange text-white px-3 py-2 rounded-full font-bold text-sm hover:bg-brand-orange-dark transition">
-                Cart ({cart.length})
+            {/* Mobile Controls */}
+            <div className="flex md:hidden items-center gap-2">
+              <button onClick={() => setActivePage('cart')}
+                className="flex items-center gap-1 bg-brand-orange text-white px-3 py-1.5 rounded-full text-sm font-black hover:bg-brand-orange-dark transition">
+                🛒 {cart.length > 0 && <span className="bg-white text-brand-orange rounded-full w-4 h-4 flex items-center justify-center text-xs font-black">{cart.length}</span>}
               </button>
-              <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-gray-900 hover:text-brand-orange transition p-2"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
                 </svg>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Mobile Dropdown Menu */}
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden glass rounded-b-2xl border-t border-white/20"
-          >
-            <div className="flex flex-col gap-2 p-4">
-              {/* Mobile Search Bar */}
-              <div className="relative mb-2">
-                <input
-                  type="text"
-                  placeholder="Search for food..."
+          {/* Mobile Menu Dropdown */}
+          {isMenuOpen && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              className="md:hidden bg-white border-t border-gray-100 px-4 pb-4 shadow-lg">
+              {/* Mobile Search */}
+              <div className="relative mt-3 mb-3">
+                <input type="text" placeholder="Search for food..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onFocus={() => searchTerm && setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="w-full px-4 py-2 rounded-full border-2 border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:border-brand-orange transition-all duration-300"
+                  className="w-full pl-4 pr-10 py-2.5 rounded-full border border-gray-300 bg-gray-50 text-sm text-gray-900 focus:outline-none focus:border-brand-orange transition"
                 />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  🔍
-                </div>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                    {searchSuggestions.map((s, i) => (
+                      <div key={i} className="px-4 py-3 hover:bg-orange-50 cursor-pointer text-sm text-gray-800"
+                        onMouseDown={() => { setSearchTerm(s); setShowSuggestions(false); }}>
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="rounded-3xl bg-white border border-gray-300 shadow-lg p-1 mt-2 text-sm max-h-52 overflow-y-auto">
-                  {searchSuggestions.map((suggestion, index) => (
-                    <div
-                      key={index}
-                      className="px-4 py-3 rounded-2xl hover:bg-gray-100 cursor-pointer text-gray-900"
-                      onMouseDown={() => {
-                        setSearchTerm(suggestion);
-                        setShowSuggestions(false);
-                      }}
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <button 
-                onClick={() => { setActivePage('home'); setIsMenuOpen(false); }} 
-                className="text-left py-3 px-4 font-bold text-sm uppercase tracking-widest hover:text-brand-orange transition rounded-lg hover:bg-white/10"
-              >
-                Home
-              </button>
-              <button 
-                onClick={() => { setActivePage('menu'); setIsMenuOpen(false); }} 
-                className="text-left py-3 px-4 font-bold text-sm uppercase tracking-widest hover:text-brand-orange transition rounded-lg hover:bg-white/10"
-              >
-                Menu
-              </button>
-              <button 
-                onClick={() => { setActivePage('location'); setIsMenuOpen(false); }} 
-                className="text-left py-3 px-4 font-bold text-sm uppercase tracking-widest hover:text-brand-orange transition rounded-lg hover:bg-white/10"
-              >
-                Location
-              </button>
-              <button 
-                onClick={() => { setActivePage('track'); setIsMenuOpen(false); }} 
-                className="text-left py-3 px-4 font-bold text-sm uppercase tracking-widest hover:text-brand-orange transition rounded-lg hover:bg-white/10"
-              >
-                Track
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </nav>
+              {/* Mobile Nav Links */}
+              <div className="grid grid-cols-2 gap-2">
+                {['home','menu','location','track'].map(page => (
+                  <button key={page} onClick={() => { setActivePage(page); setIsMenuOpen(false); }}
+                    className={`py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition text-center ${activePage === page ? 'bg-brand-orange text-white' : 'bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-brand-orange'}`}>
+                    {page}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </nav>
       )}
 
       <main className={displayNavbar ? 'pt-16 sm:pt-20' : 'pt-0'}>
@@ -469,11 +422,11 @@ function App() {
             <div className="max-w-7xl mx-auto px-6 pt-6 sm:pt-8">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="rounded-[2rem] bg-white/90 p-3 shadow-2xl backdrop-blur-xl">
+                  <div className="rounded-2xl bg-white/90 p-2 shadow-xl backdrop-blur-xl">
                     <img
                       src="/images/logo.png"
                       alt="Breadwrapz Logo"
-                      className="h-20 w-20 sm:h-20 sm:w-20 md:h-24 md:w-24 object-contain"
+                      className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
                     />
                   </div>
                   <div className="hidden md:block">
