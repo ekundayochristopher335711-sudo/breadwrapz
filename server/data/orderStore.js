@@ -1,68 +1,47 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { MongoClient } from 'mongodb';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataPath = path.join(__dirname, 'orders.json');
+const client = new MongoClient(process.env.MONGODB_URI);
+let col;
 
-let orders;
-
-async function loadOrders() {
-  if (orders) return orders;
-
-  try {
-    const content = await fs.readFile(dataPath, 'utf8');
-    orders = JSON.parse(content);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      orders = [];
-    } else {
-      throw error;
-    }
+async function getCollection() {
+  if (!col) {
+    await client.connect();
+    col = client.db('breadwrapz').collection('orders');
+    await col.createIndex({ orderId: 1 }, { unique: true });
+    await col.createIndex({ reference: 1 });
   }
-
-  return orders;
-}
-
-async function saveOrders() {
-  orders = orders || [];
-  await fs.mkdir(path.dirname(dataPath), { recursive: true });
-  await fs.writeFile(dataPath, JSON.stringify(orders, null, 2), 'utf8');
+  return col;
 }
 
 export async function createOrder(order) {
-  orders = await loadOrders();
-  orders.push(order);
-  await saveOrders();
+  const c = await getCollection();
+  await c.insertOne({ ...order, _id: order.orderId });
   return order;
 }
 
 export async function getOrder(orderId) {
-  const list = await loadOrders();
-  return list.find((order) => order.orderId === orderId);
+  const c = await getCollection();
+  const order = await c.findOne({ orderId }, { projection: { _id: 0 } });
+  return order || null;
 }
 
 export async function getOrderByReference(reference) {
-  const list = await loadOrders();
-  return list.find((order) => order.reference === reference);
+  const c = await getCollection();
+  const order = await c.findOne({ reference }, { projection: { _id: 0 } });
+  return order || null;
 }
 
 export async function updateOrder(orderId, updates) {
-  orders = await loadOrders();
-  const index = orders.findIndex((order) => order.orderId === orderId);
-  if (index === -1) return null;
-
-  orders[index] = {
-    ...orders[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-
-  await saveOrders();
-  return orders[index];
+  const c = await getCollection();
+  const result = await c.findOneAndUpdate(
+    { orderId },
+    { $set: { ...updates, updatedAt: new Date().toISOString() } },
+    { returnDocument: 'after', projection: { _id: 0 } }
+  );
+  return result;
 }
 
 export async function getAllOrders() {
-  const list = await loadOrders();
-  return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const c = await getCollection();
+  return c.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
 }

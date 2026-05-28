@@ -14,6 +14,11 @@ if (!PAYSTACK_SECRET_KEY) {
   process.exit(1);
 }
 
+if (!process.env.MONGODB_URI) {
+  console.error('Missing MONGODB_URI in environment.');
+  process.exit(1);
+}
+
 app.use(cors({ origin: ['http://localhost:5173', 'https://breadwrapz.netlify.app'] }));
 app.use(express.json({
   verify: (req, res, buf) => {
