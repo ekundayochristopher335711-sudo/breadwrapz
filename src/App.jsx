@@ -229,6 +229,10 @@ function App() {
     }));
   };
 
+  const removeFromCart = (index) => {
+    setCart(prev => prev.filter((_, i) => i !== index));
+  };
+
   const sendOrder = async () => {
     if (!customerName.trim()) {
       alert('Please enter your name for delivery before checkout.');
@@ -683,12 +687,20 @@ function App() {
               ) : (
                 <div className="rounded-[2rem] bg-white/90 glass p-8 shadow-xl border border-gray-200/50 space-y-4 backdrop-blur-sm">
                   {cart.map((item, i) => (
-                    <div key={i} className="flex justify-between items-center gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
+                    <div key={i} className="flex justify-between items-center gap-4 border-b border-gray-100 pb-4">
                       <div>
-                        <p className="font-black uppercase text-gray-900 dark:text-white">{item.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">₦{item.price.toLocaleString()}</p>
+                        <p className="font-black uppercase text-gray-900">{item.name}</p>
+                        <p className="text-sm text-gray-500">₦{item.price.toLocaleString()}</p>
                       </div>
-                      <span className="font-black text-brand-orange">₦{item.price.toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-brand-orange">₦{item.price.toLocaleString()}</span>
+                        <button
+                          onClick={() => removeFromCart(i)}
+                          className="w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-500 hover:text-white font-black text-sm flex items-center justify-center transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <div className="pt-4 space-y-2 border-t border-gray-100">
