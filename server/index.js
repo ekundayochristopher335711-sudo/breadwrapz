@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import paymentRoute from './routes/payment.js';
+import authRoute from './routes/auth.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 if (!PAYSTACK_SECRET_KEY) {
@@ -19,15 +21,17 @@ if (!process.env.MONGODB_URI) {
   process.exit(1);
 }
 
-app.use(cors({ origin: ['http://localhost:5173', 'https://breadwrapz.netlify.app'] }));
+app.use(cors({ origin: [FRONTEND_URL, 'https://breadwrapz.netlify.app'] }));
 app.use(express.json({
   verify: (req, res, buf) => {
     req.rawBody = buf;
   },
 }));
 
+app.use('/api/auth', authRoute);
 app.use('/api', paymentRoute);
 
 app.listen(PORT, () => {
   console.log(`Paystack API server running on http://localhost:${PORT}`);
+  console.log(`Frontend allowed origin: ${FRONTEND_URL}`);
 });

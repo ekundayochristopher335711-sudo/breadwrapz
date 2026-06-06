@@ -3,15 +3,35 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { menuDataNoImages } from './menuData.js';
 import Footer from './components/Footer.jsx';
+import { supabase } from './lib/supabase.js';
 
 const API = import.meta.env.VITE_API_URL || '';
-const DELIVERY_FEE = 500;
+const RESTAURANT_LOCATION = { lat: 7.717851, lng: 5.253719 };
+const DELIVERY_RATE_PER_KM = 50;
+const MIN_DELIVERY_FEE = 50;
 
 function calcPaystackFee(amount) {
   if (amount <= 0) return 0;
   let fee = Math.ceil(amount * 0.015);
   if (amount > 2500) fee += 100;
   return Math.min(fee, 2000);
+}
+
+function calculateDistanceKm(lat1, lng1, lat2, lng2) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function calculateDeliveryFee(distanceKm) {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return MIN_DELIVERY_FEE;
+  return Math.max(MIN_DELIVERY_FEE, Math.ceil(distanceKm) * DELIVERY_RATE_PER_KM);
 }
 
 function App() {
@@ -21,7 +41,14 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const raw = localStorage.getItem('cart');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [popularityCounts, setPopularityCounts] = useState(() => {
     try {
       const raw = localStorage.getItem('popularityCounts');
@@ -31,8 +58,36 @@ function App() {
     }
   });
   const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [deliveryCoords, setDeliveryCoords] = useState(null);
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState(null);
+  const [deliveryFee, setDeliveryFee] = useState(MIN_DELIVERY_FEE);
+  const [locationError, setLocationError] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [authToken, setAuthToken] = useState('');
+  const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState('login');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authStatusMessage, setAuthStatusMessage] = useState('');
+  const [backendOrderHistory, setBackendOrderHistory] = useState([]);
+  const [savedAddresses, setSavedAddresses] = useState(() => {
+    try {
+      const raw = localStorage.getItem('savedAddresses');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [orderHistory, setOrderHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem('orderHistory');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
   const [orderId, setOrderId] = useState('');
   const [orderEmailOrPhone, setOrderEmailOrPhone] = useState('');
   const [orderReference, setOrderReference] = useState('');
@@ -65,7 +120,7 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname);
       setOrderReference(ref);
       setActivePage('track');
-      fetch(`${API}/api/verify-payment`, {
+      fetch(`${API}/verify-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reference: ref }),
@@ -137,23 +192,92 @@ function App() {
     );
   }, [searchTerm, selectedCategory]);
 
-  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price, 0), [cart]);
-  const paystackFee = useMemo(() => calcPaystackFee(subtotal + DELIVERY_FEE), [subtotal]);
-  const total = useMemo(() => subtotal + DELIVERY_FEE + paystackFee, [subtotal, paystackFee]);
+  const cartCount = useMemo(() => cart.reduce((sum, item) => sum + (item.quantity || 1), 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0), [cart]);
+  const paystackFee = useMemo(() => calcPaystackFee(subtotal + deliveryFee), [subtotal, deliveryFee]);
+  const total = useMemo(() => subtotal + deliveryFee + paystackFee, [subtotal, deliveryFee, paystackFee]);
 
   useEffect(() => {
     try {
       localStorage.setItem('popularityCounts', JSON.stringify(popularityCounts));
+      localStorage.setItem('cart', JSON.stringify(cart));
+      localStorage.setItem('savedAddresses', JSON.stringify(savedAddresses));
+      localStorage.setItem('orderHistory', JSON.stringify(orderHistory));
+      localStorage.setItem('customerProfile', JSON.stringify(user || { customerName, customerEmail, customerPhone }));
+      localStorage.setItem('authToken', authToken);
     } catch {
       // ignore localStorage write errors
     }
-  }, [popularityCounts]);
+  }, [popularityCounts, cart, savedAddresses, orderHistory, user, authToken, customerName, customerEmail, customerPhone]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) applySession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        applySession(session);
+      } else {
+        setAuthToken('');
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  function applySession(session) {
+    const u = session.user;
+    const meta = u.user_metadata || {};
+    setAuthToken(session.access_token);
+    setUser({ userId: u.id, name: meta.name || '', email: u.email || '', phone: meta.phone || '' });
+    if (meta.name) setCustomerName(meta.name);
+    if (u.email) setCustomerEmail(u.email);
+    if (meta.phone) setCustomerPhone(meta.phone);
+  }
+
+  useEffect(() => {
+    if (!user?.userId) {
+      setBackendOrderHistory([]);
+      return;
+    }
+
+    const fetchOrders = async () => {
+      try {
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('order_id, reference, amount, status, delivery_location, delivery_fee, delivery_distance_km, created_at')
+          .eq('user_id', user.userId)
+          .order('created_at', { ascending: false });
+
+        setBackendOrderHistory(
+          (orders || []).map((o) => ({
+            orderId: o.order_id,
+            reference: o.reference,
+            amount: o.amount,
+            status: o.status,
+            deliveryLocation: o.delivery_location,
+            deliveryFee: o.delivery_fee,
+            deliveryDistanceKm: o.delivery_distance_km,
+            createdAt: o.created_at,
+          })),
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchOrders();
+  }, [user]);
 
   const topItems = useMemo(() => {
     const itemsWithCount = menuDataNoImages.map(i => ({ ...i, orders: popularityCounts[i.id] || 0 }));
     itemsWithCount.sort((a, b) => b.orders - a.orders || (b.available === a.available ? 0 : (a.available ? -1 : 1)));
     return itemsWithCount.slice(0, 3);
   }, [popularityCounts]);
+
+  const historyToShow = user ? backendOrderHistory : orderHistory;
 
   const trackOrder = async () => {
     setTrackError('');
@@ -166,7 +290,7 @@ function App() {
     }
 
     try {
-      const response = await fetch(`${API}/api/track-order/${encodeURIComponent(normalizedOrderId)}`);
+      const response = await fetch(`${API}/track-order?orderId=${encodeURIComponent(normalizedOrderId)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -192,7 +316,7 @@ function App() {
     }
 
     try {
-      const response = await fetch(`${API}/api/verify-payment`, {
+      const response = await fetch(`${API}/verify-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,15 +346,128 @@ function App() {
   };
 
   const addToCart = (item) => {
-    setCart(prev => [...prev, item]);
+    setCart(prev => {
+      const existing = prev.find((cartItem) => cartItem.id === item.id);
+      if (existing) {
+        return prev.map((cartItem) => cartItem.id === item.id
+          ? { ...cartItem, quantity: (cartItem.quantity || 1) + 1 }
+          : cartItem
+        );
+      }
+      return [...prev, { ...item, quantity: 1 }];
+    });
     setPopularityCounts(prev => ({
       ...prev,
       [item.id]: (prev[item.id] || 0) + 1,
     }));
   };
 
-  const removeFromCart = (index) => {
-    setCart(prev => prev.filter((_, i) => i !== index));
+  const removeFromCart = (itemId) => {
+    setCart(prev => prev.flatMap((cartItem) => {
+      if (cartItem.id !== itemId) return cartItem;
+      const quantity = cartItem.quantity || 1;
+      if (quantity > 1) {
+        return { ...cartItem, quantity: quantity - 1 };
+      }
+      return [];
+    }));
+  };
+
+  const logout = () => {
+    supabase.auth.signOut();
+    setAuthError('');
+  };
+
+  const authenticate = async (mode) => {
+    setAuthError('');
+    setAuthStatusMessage('');
+
+    if (!customerEmail.trim() || !authPassword) {
+      setAuthError('Please enter email and password.');
+      return;
+    }
+
+    try {
+      if (mode === 'register') {
+        if (!customerName.trim()) {
+          setAuthError('Please enter your name.');
+          return;
+        }
+        const { error } = await supabase.auth.signUp({
+          email: customerEmail.trim(),
+          password: authPassword,
+          options: { data: { name: customerName.trim(), phone: customerPhone.trim() } },
+        });
+        if (error) { setAuthError(error.message); return; }
+        setAuthStatusMessage('Verification link sent. Check your email before logging in.');
+        setAuthMode('login');
+        setAuthPassword('');
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: customerEmail.trim(),
+        password: authPassword,
+      });
+      if (error) { setAuthError(error.message); return; }
+      // onAuthStateChange fires and calls applySession
+      setAuthPassword('');
+      setActivePage('profile');
+    } catch (error) {
+      console.error('auth error:', error);
+      setAuthError('Unable to complete authentication. Please try again.');
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!user) return;
+    const { error } = await supabase.auth.updateUser({
+      data: { name: customerName, phone: customerPhone },
+    });
+    if (!error) {
+      setUser((prev) => ({ ...prev, name: customerName, phone: customerPhone }));
+    }
+  };
+
+  const saveCurrentAddress = () => {
+    const address = deliveryLocation.trim();
+    if (!address) return;
+    setSavedAddresses((prev) => {
+      if (prev.includes(address)) return prev;
+      return [address, ...prev].slice(0, 6);
+    });
+  };
+
+  const requestDeliveryLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not available in this browser.');
+      return;
+    }
+
+    setLocationError('Requesting location permission...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const distanceKm = calculateDistanceKm(RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng, latitude, longitude);
+        const fee = calculateDeliveryFee(distanceKm);
+        setDeliveryCoords({ lat: latitude, lng: longitude });
+        setDeliveryDistanceKm(distanceKm);
+        setDeliveryFee(fee);
+        setDeliveryLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        setLocationError('');
+      },
+      () => {
+        setLocationError('Location permission denied or unavailable. Please enter your address manually or try again.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  };
+
+  const clearDeliveryLocation = () => {
+    setDeliveryCoords(null);
+    setDeliveryDistanceKm(null);
+    setDeliveryFee(MIN_DELIVERY_FEE);
+    setLocationError('');
   };
 
   const sendOrder = async () => {
@@ -255,18 +492,25 @@ function App() {
     }
 
     try {
-      const response = await fetch(`${API}/api/initialize-payment`, {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+      const response = await fetch(`${API}/initialize-payment`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
+          email: customerEmail.trim(),
           contact: customerPhone.trim(),
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
-          amount: total,
           items: cart,
           deliveryLocation: deliveryLocation.trim(),
+          deliveryDistanceKm,
+          deliveryFee,
+          deliveryCoords,
         }),
       });
 
@@ -279,6 +523,19 @@ function App() {
 
       setOrderId(data.order.orderId);
       setOrderReference(data.order.reference);
+      setOrderHistory((prev) => [
+        {
+          orderId: data.order.orderId,
+          reference: data.order.reference,
+          amount: data.order.amount,
+          status: data.order.status,
+          deliveryLocation: deliveryLocation.trim(),
+          deliveryFee,
+          deliveryDistanceKm,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ].slice(0, 20));
       setCart([]);
 
       if (data.paystack.authorization_url) {
@@ -318,7 +575,7 @@ function App() {
 
             {/* Logo */}
             <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => { setActivePage('home'); scrollTo(homeRef); }}>
-              <img src="/images/logo.png" alt="Breadwrapz" className="h-10 w-10 object-contain" />
+              <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-10 w-10 object-contain" />
               <span className="font-black text-gray-900 text-base hidden sm:block tracking-tight">BREADWRAPZ</span>
             </div>
 
@@ -348,7 +605,7 @@ function App() {
 
             {/* Desktop Nav Links */}
             <div className="hidden md:flex items-center gap-1">
-              {['home','menu','location','track'].map(page => (
+              {['home','menu','location','track','profile'].map(page => (
                 <button key={page} onClick={() => setActivePage(page)}
                   className={`px-3 py-2 rounded-lg text-sm font-bold uppercase tracking-wide transition ${activePage === page ? 'text-brand-orange' : 'text-gray-700 hover:text-brand-orange'}`}>
                   {page}
@@ -356,7 +613,7 @@ function App() {
               ))}
               <button onClick={() => setActivePage('cart')}
                 className="ml-2 flex items-center gap-1.5 bg-brand-orange text-white px-4 py-2 rounded-full text-sm font-black hover:bg-brand-orange-dark transition">
-                🛒 Cart {cart.length > 0 && <span className="bg-white text-brand-orange rounded-full w-5 h-5 flex items-center justify-center text-xs font-black">{cart.length}</span>}
+                🛒 Cart {cartCount > 0 && <span className="bg-white text-brand-orange rounded-full w-5 h-5 flex items-center justify-center text-xs font-black">{cartCount}</span>}
               </button>
             </div>
 
@@ -364,7 +621,7 @@ function App() {
             <div className="flex md:hidden items-center gap-2">
               <button onClick={() => setActivePage('cart')}
                 className="flex items-center gap-1 bg-brand-orange text-white px-3 py-1.5 rounded-full text-sm font-black hover:bg-brand-orange-dark transition">
-                🛒 {cart.length > 0 && <span className="bg-white text-brand-orange rounded-full w-4 h-4 flex items-center justify-center text-xs font-black">{cart.length}</span>}
+                🛒 {cartCount > 0 && <span className="bg-white text-brand-orange rounded-full w-4 h-4 flex items-center justify-center text-xs font-black">{cartCount}</span>}
               </button>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition">
@@ -402,7 +659,7 @@ function App() {
               </div>
               {/* Mobile Nav Links */}
               <div className="grid grid-cols-2 gap-2">
-                {['home','menu','location','track'].map(page => (
+                {['home','menu','location','track','profile'].map(page => (
                   <button key={page} onClick={() => { setActivePage(page); setIsMenuOpen(false); }}
                     className={`py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition text-center ${activePage === page ? 'bg-brand-orange text-white' : 'bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-brand-orange'}`}>
                     {page}
@@ -424,7 +681,7 @@ function App() {
                 <div className="flex items-center gap-3">
                   <div className="rounded-2xl bg-white/90 p-2 shadow-xl backdrop-blur-xl">
                     <img
-                      src="/images/logo.png"
+                      src="/images/breadwrapz-logo.svg"
                       alt="Breadwrapz Logo"
                       className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
                     />
@@ -453,7 +710,7 @@ function App() {
                     onClick={() => setActivePage('cart')}
                     className="rounded-full bg-black text-white px-5 py-3 font-black transition hover:bg-gray-900"
                   >
-                    Cart ({cart.length})
+                    Cart ({cartCount})
                   </button>
                 </div>
               </div>
@@ -639,20 +896,23 @@ function App() {
                 </div>
               ) : (
                 <div className="rounded-[2rem] bg-white/90 glass p-8 shadow-xl border border-gray-200/50 space-y-4 backdrop-blur-sm">
-                  {cart.map((item, i) => (
-                    <div key={i} className="flex justify-between items-center gap-4 border-b border-gray-100 pb-4">
-                      <div>
-                        <p className="font-black uppercase text-gray-900">{item.name}</p>
-                        <p className="text-sm text-gray-500">₦{item.price.toLocaleString()}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-black text-brand-orange">₦{item.price.toLocaleString()}</span>
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex flex-col gap-3 border-b border-gray-100 pb-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-black uppercase text-gray-900">{item.name}</p>
+                          <p className="text-sm text-gray-500">₦{item.price.toLocaleString()} each</p>
+                        </div>
                         <button
-                          onClick={() => removeFromCart(i)}
-                          className="w-7 h-7 rounded-full bg-red-100 text-red-500 hover:bg-red-500 hover:text-white font-black text-sm flex items-center justify-center transition"
+                          onClick={() => removeFromCart(item.id)}
+                          className="w-8 h-8 rounded-full bg-red-100 text-red-500 hover:bg-red-500 hover:text-white font-black text-sm flex items-center justify-center transition"
                         >
                           ✕
                         </button>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+                        <span>Qty: {item.quantity || 1}</span>
+                        <span className="font-bold text-gray-900">Line total: ₦{((item.price * (item.quantity || 1)).toLocaleString())}</span>
                       </div>
                     </div>
                   ))}
@@ -663,7 +923,7 @@ function App() {
                     </div>
                     <div className="flex justify-between text-gray-600 text-sm">
                       <span>Delivery fee</span>
-                      <span>₦{DELIVERY_FEE.toLocaleString()}</span>
+                      <span>₦{deliveryFee.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-gray-500 text-sm">
                       <span>Paystack fee</span>
@@ -692,6 +952,15 @@ function App() {
                     }`}
                   />
                   <input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="Email address"
+                    className={`w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none transition-colors ${
+                      customerEmail.trim() ? 'border-green-500 focus:border-green-600' : 'border-gray-300 focus:border-brand-orange'
+                    }`}
+                  />
+                  <input
                     type="tel"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
@@ -704,12 +973,48 @@ function App() {
                     type="text"
                     value={deliveryLocation}
                     onChange={(e) => setDeliveryLocation(e.target.value)}
-                    placeholder="Enter your full address..."
+                    placeholder="Enter your full address or coordinates"
                     className={`w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none transition-colors ${
                       deliveryLocation.trim() ? 'border-green-500 focus:border-green-600' : 'border-gray-300 focus:border-brand-orange'
                     }`}
                   />
                 </div>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    onClick={requestDeliveryLocation}
+                    className="w-full sm:w-auto px-5 py-4 rounded-full bg-brand-orange text-white font-bold transition hover:bg-brand-orange-dark"
+                  >
+                    Use my location
+                  </button>
+                  <button
+                    onClick={saveCurrentAddress}
+                    className="w-full sm:w-auto px-5 py-4 rounded-full border-2 border-brand-orange text-brand-orange font-bold transition hover:bg-brand-orange/10"
+                  >
+                    Save address
+                  </button>
+                  <button
+                    onClick={clearDeliveryLocation}
+                    className="w-full sm:w-auto px-5 py-4 rounded-full border-2 border-gray-300 text-gray-700 font-bold transition hover:bg-gray-100"
+                  >
+                    Clear location
+                  </button>
+                </div>
+                {locationError && <p className="text-sm text-red-600 mt-3">{locationError}</p>}
+                {deliveryDistanceKm !== null && (
+                  <p className="text-sm text-gray-600 mt-3">
+                    Delivery distance: <span className="font-semibold">{deliveryDistanceKm.toFixed(1)} km</span> • fee: <span className="font-semibold">₦{deliveryFee.toLocaleString()}</span>
+                  </p>
+                )}
+                {deliveryCoords && (
+                  <div className="mt-4 overflow-hidden rounded-3xl border border-gray-200">
+                    <iframe
+                      src={`https://maps.google.com/maps?q=${deliveryCoords.lat},${deliveryCoords.lng}&z=15&output=embed`}
+                      className="w-full h-64"
+                      loading="lazy"
+                      title="Your delivery location"
+                    />
+                  </div>
+                )}
                 <p className="text-sm text-gray-500 mt-3">Include landmarks, street name and house number for fast delivery.</p>
               </div>
               <button
@@ -799,6 +1104,180 @@ function App() {
                   <div className="text-center text-gray-600">
                     <p className="text-lg font-semibold">Enter an order ID to see status progress.</p>
                     <p className="mt-4">This is a demo tracker for your restaurant website.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className={activePage === 'profile' ? 'bg-white py-20' : 'hidden'}>
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-10">
+              <p className="text-sm uppercase tracking-[0.4em] text-brand-orange font-bold">Profile</p>
+              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mt-4">Your customer profile</h2>
+              <p className="text-gray-600 mt-4 max-w-2xl mx-auto">Save your contact details, manage delivery addresses, and review your recent transaction history.</p>
+            </div>
+            <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr]">
+              <div className="rounded-[2rem] bg-white/90 glass p-10 shadow-xl border border-gray-200/50">
+                <h3 className="text-3xl font-black text-brand-orange mb-4">Account</h3>
+                {!user ? (
+                  <div className="space-y-4">
+                    {authMode === 'register' && (
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Full name"
+                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                      />
+                    )}
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="Email address"
+                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                    />
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Mobile number"
+                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                    />
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="Password"
+                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                    />
+                    {authStatusMessage && <p className="text-sm text-green-600">{authStatusMessage}</p>}
+                    {authError && <p className="text-sm text-red-600">{authError}</p>}
+                    <button
+                      onClick={() => authenticate(authMode)}
+                      className="w-full rounded-full bg-brand-orange text-white py-4 font-bold uppercase tracking-wider shadow-lg hover:bg-brand-orange-dark transition"
+                    >
+                      {authMode === 'register' ? 'Register' : 'Login'}
+                    </button>
+                    <button
+                      onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                      className="w-full rounded-full border border-brand-orange text-brand-orange py-4 font-bold transition hover:bg-brand-orange/10"
+                    >
+                      {authMode === 'login' ? 'Create an account' : 'Already have an account? Login'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-2">Full name</label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-2">Email</label>
+                      <input
+                        type="email"
+                        value={customerEmail}
+                        readOnly
+                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-gray-100 cursor-not-allowed border-gray-300 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-2">Mobile number</label>
+                      <input
+                        type="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        onClick={saveProfile}
+                        className="flex-1 rounded-full bg-brand-orange text-white py-4 font-bold uppercase tracking-wider shadow-lg hover:bg-brand-orange-dark transition"
+                      >
+                        Save profile
+                      </button>
+                      <button
+                        onClick={logout}
+                        className="flex-1 rounded-full border border-brand-orange text-brand-orange py-4 font-bold transition hover:bg-brand-orange/10"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-8 rounded-[2rem] bg-gray-50 p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold text-gray-900">Saved delivery addresses</h4>
+                    <button
+                      onClick={() => setSavedAddresses([])}
+                      className="text-sm text-brand-orange hover:text-brand-orange-dark font-semibold"
+                    >Clear</button>
+                  </div>
+                  {savedAddresses.length === 0 ? (
+                    <p className="text-sm text-gray-500">Save addresses from checkout to reuse them faster.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {savedAddresses.map((address, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setDeliveryLocation(address)}
+                          className="w-full text-left rounded-3xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-700 hover:bg-gray-100 transition"
+                        >
+                          {address}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] bg-white/90 glass p-10 shadow-xl border border-gray-200/50">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-3xl font-black text-brand-orange">Order history</h3>
+                    <p className="text-sm text-gray-500 mt-2">{user ? 'Protected order history from your account.' : 'Recent checkout and transaction records stored locally.'}</p>
+                  </div>
+                  {!user && (
+                    <button
+                      onClick={() => setOrderHistory([])}
+                      className="rounded-full border border-brand-orange px-4 py-2 text-sm font-bold text-brand-orange hover:bg-brand-orange/10 transition"
+                    >Clear history</button>
+                  )}
+                </div>
+                {historyToShow.length === 0 ? (
+                  <div className="rounded-3xl bg-gray-50 p-8 text-center text-gray-500">No orders yet. Place an order to see history here.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {historyToShow.map((order) => (
+                      <div key={order.reference || order.orderId} className="rounded-3xl border border-gray-200 p-5 bg-white shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm text-gray-500">Order ID</p>
+                            <p className="font-black text-gray-900">{order.orderId}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Status</p>
+                            <p className="font-black text-brand-orange">{order.status}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Total</p>
+                            <p className="font-black text-gray-900">₦{Number(order.amount).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <p className="text-sm text-gray-500">Delivery fee: ₦{Number(order.deliveryFee || 0).toLocaleString()}</p>
+                          <p className="text-sm text-gray-500">Distance: {order.deliveryDistanceKm ? `${order.deliveryDistanceKm.toFixed(1)} km` : 'Unknown'}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

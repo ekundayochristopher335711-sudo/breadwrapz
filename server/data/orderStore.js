@@ -41,6 +41,11 @@ export async function updateOrder(orderId, updates) {
   return result;
 }
 
+export async function getOrdersByUserId(userId) {
+  const c = await getCollection();
+  return c.find({ userId }, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
+}
+
 export async function getAllOrders() {
   const c = await getCollection();
   return c.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();

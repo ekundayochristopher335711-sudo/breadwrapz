@@ -9,7 +9,7 @@ const Navbar = ({ cartCount, onCartClick }) => {
           {/* Logo & Brand */}
           <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition">
             <img
-              src="/images/logo.png"
+              src="/images/breadwrapz-logo.svg"
               alt="Breadwrapz Logo"
               className="h-28 w-28 md:h-36 md:w-36 object-contain"
               onError={(e) => {
@@ -25,7 +25,7 @@ const Navbar = ({ cartCount, onCartClick }) => {
             </Link>
                   <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition -mt-3">
                     <img
-                      src="/images/logo.png"
+                      src="/images/breadwrapz-logo.svg"
                       alt="Breadwrapz Logo"
                       className="h-28 w-28 md:h-36 md:w-36 object-contain"
                       onError={(e) => {

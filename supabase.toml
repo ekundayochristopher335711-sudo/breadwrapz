@@ -1,0 +1,9 @@
+[project]
+name = "breadwrapz"
+id = "ryiumdzmdchfwkxansue"
+
+[local]
+port = 54321
+
+[functions]
+directory = "supabase/functions"

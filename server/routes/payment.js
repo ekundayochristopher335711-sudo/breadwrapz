@@ -2,13 +2,27 @@ import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
 import { createOrder, getOrder, getOrderByReference, updateOrder, getAllOrders } from '../data/orderStore.js';
-import { calculateTotal } from '../data/menuPrices.js';
+import { calculateTotal, calculateDeliveryFee, DELIVERY_FEE } from '../data/menuPrices.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
 const MAX_ORDER_AMOUNT = 500000; // ₦500,000 hard cap per order
+const JWT_SECRET = process.env.JWT_SECRET || 'breadwrapz_secret';
+
+function getUserIdFromToken(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.userId;
+  } catch {
+    return null;
+  }
+}
 
 function adminKeyValid(provided) {
   const expected = process.env.ADMIN_KEY;
@@ -64,7 +78,7 @@ const verifyLimiter = rateLimit({
 
 router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
   try {
-    const { email, items, deliveryLocation, contact, customerName, customerPhone } = req.body;
+    const { email, items, deliveryLocation, contact, customerName, customerPhone, deliveryDistanceKm } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Cart is empty.' });
@@ -74,8 +88,13 @@ router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Delivery location is required.' });
     }
 
+    const parsedDistance = Number(deliveryDistanceKm);
+    const computedDeliveryFee = Number.isFinite(parsedDistance) && parsedDistance > 0
+      ? calculateDeliveryFee(parsedDistance)
+      : DELIVERY_FEE;
+
     // Always calculate amount server-side — never trust client amount
-    const amount = calculateTotal(items);
+    const amount = calculateTotal(items, computedDeliveryFee);
 
     if (amount <= 0) {
       return res.status(400).json({ error: 'Order total must be greater than zero.' });
@@ -89,9 +108,11 @@ router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
     const orderId = `BRD-${Date.now()}`;
     const reference = orderId;
 
+    const userId = getUserIdFromToken(req);
     const order = await createOrder({
       orderId,
       reference,
+      userId,
       email: normalizedEmail,
       contact,
       customerName,
@@ -99,6 +120,8 @@ router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
       amount,
       items,
       deliveryLocation: deliveryLocation.trim(),
+      deliveryDistanceKm: Number.isFinite(parsedDistance) && parsedDistance > 0 ? parsedDistance : null,
+      deliveryFee: computedDeliveryFee,
       status: 'Order Received',
       createdAt: new Date().toISOString(),
     });
@@ -109,8 +132,8 @@ router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
         email: normalizedEmail,
         amount: Math.round(amount * 100),
         reference,
-        callback_url: process.env.PAYSTACK_CALLBACK_URL || 'https://breadwrapz.netlify.app/',
-        metadata: { orderId, contact, deliveryLocation, items },
+        callback_url: process.env.PAYSTACK_CALLBACK_URL || process.env.FRONTEND_URL || 'http://localhost:5173',
+        metadata: { orderId, contact, deliveryLocation, items, deliveryDistanceKm: parsedDistance, deliveryFee: computedDeliveryFee },
       },
       {
         headers: {
@@ -123,7 +146,7 @@ router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
     notifyOwnerNewOrder(order);
 
     return res.json({
-      order: { orderId: order.orderId, reference: order.reference, amount: order.amount, status: order.status },
+      order: { orderId: order.orderId, reference: order.reference, amount: order.amount, status: order.status, deliveryFee: order.deliveryFee, deliveryDistanceKm: order.deliveryDistanceKm },
       paystack: response.data.data,
     });
   } catch (error) {

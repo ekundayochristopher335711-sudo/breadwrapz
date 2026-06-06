@@ -12,7 +12,7 @@ export default function Admin() {
 
   const fetchOrders = useCallback(async (adminKey) => {
     try {
-      const res = await fetch(`${API}/api/admin/orders`, {
+      const res = await fetch(`${API}/admin-orders`, {
         headers: { 'x-admin-key': adminKey },
       });
       if (res.status === 401) { setError('Wrong password.'); return; }
@@ -39,10 +39,10 @@ export default function Admin() {
   const updateStatus = async (orderId, status) => {
     setUpdating(orderId);
     try {
-      await fetch(`${API}/api/admin/orders/${orderId}/status`, {
+      await fetch(`${API}/admin-orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ orderId, status }),
       });
       await fetchOrders(key);
     } catch {
@@ -55,7 +55,7 @@ export default function Admin() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm">
-          <img src="/images/logo.png" alt="Breadwrapz" className="h-16 mx-auto mb-6" />
+          <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-16 mx-auto mb-6" />
           <h2 className="text-2xl font-black text-center text-gray-900 mb-6">Admin Login</h2>
           <input
             type="password"
@@ -82,7 +82,7 @@ export default function Admin() {
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <img src="/images/logo.png" alt="Breadwrapz" className="h-12" />
+            <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-12" />
             <h1 className="text-3xl font-black text-gray-900">Orders</h1>
           </div>
           <div className="flex items-center gap-3">

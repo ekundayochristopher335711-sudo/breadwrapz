@@ -1,4 +1,5 @@
 export const DELIVERY_FEE = 500;
+export const DELIVERY_RATE_PER_KM = 50;
 
 export function calculatePaystackFee(amount) {
   if (amount <= 0) return 0;
@@ -35,10 +36,15 @@ export const MENU_PRICES = {
   24: 0,      // Protein & Sides
 };
 
-export function calculateTotal(items) {
+export function calculateDeliveryFee(distanceKm) {
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return DELIVERY_FEE;
+  return Math.max(DELIVERY_FEE, Math.ceil(distanceKm) * DELIVERY_RATE_PER_KM);
+}
+
+export function calculateTotal(items, deliveryFee = DELIVERY_FEE) {
   if (!Array.isArray(items) || items.length === 0) return 0;
-  const subtotal = items.reduce((sum, item) => sum + (MENU_PRICES[item.id] ?? 0), 0);
-  const withDelivery = subtotal + DELIVERY_FEE;
+  const subtotal = items.reduce((sum, item) => sum + (MENU_PRICES[item.id] ?? 0) * (item.quantity || 1), 0);
+  const withDelivery = subtotal + deliveryFee;
   const paystackFee = calculatePaystackFee(withDelivery);
   return withDelivery + paystackFee;
 }
