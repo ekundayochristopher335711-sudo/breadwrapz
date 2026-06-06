@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
         email: normalizedEmail,
         amount: Math.round(amount * 100),
         reference,
-        callback_url: Deno.env.get('PAYSTACK_CALLBACK_URL') || 'https://breadwrapz.netlify.app',
+        callback_url: Deno.env.get('PAYSTACK_CALLBACK_URL') || 'https://breadwrapz2.netlify.app',
         metadata: { orderId, contact, deliveryLocation, items, deliveryDistanceKm: parsedDistance, deliveryFee: computedDeliveryFee },
       }),
     });
