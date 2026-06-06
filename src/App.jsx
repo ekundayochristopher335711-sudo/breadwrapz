@@ -94,6 +94,7 @@ function App() {
   const [paymentMessage, setPaymentMessage] = useState('');
   const [trackStatus, setTrackStatus] = useState(null);
   const [trackError, setTrackError] = useState('');
+  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
 
   const navRef = useRef(null);
   const homeRef = useRef(null);
@@ -153,7 +154,7 @@ function App() {
     };
   }, [activePage]);
 
-  const displayNavbar = activePage !== 'home' || hasScrolledPastHero;
+  const displayNavbar = true;
 
   const categories = useMemo(() => ['All', ...new Set(menuDataNoImages.map(item => item.category))], []);
 
@@ -575,7 +576,7 @@ function App() {
 
             {/* Logo */}
             <div className="flex items-center gap-2 cursor-pointer flex-shrink-0" onClick={() => { setActivePage('home'); scrollTo(homeRef); }}>
-              <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-10 w-10 object-contain" />
+              <img src="/images/logo.png" alt="Breadwrapz" className="h-10 w-10 object-contain" />
               <span className="font-black text-gray-900 text-base hidden sm:block tracking-tight">BREADWRAPZ</span>
             </div>
 
@@ -635,7 +636,7 @@ function App() {
           {/* Mobile Menu Dropdown */}
           {isMenuOpen && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-              className="md:hidden bg-white border-t border-gray-100 px-4 pb-4 shadow-lg">
+              className="md:hidden absolute top-full right-0 w-[60vw] max-w-xs min-h-[calc(100vh-4rem)] bg-white border border-gray-100 px-4 pb-4 shadow-lg rounded-bl-3xl rounded-tl-3xl">
               {/* Mobile Search */}
               <div className="relative mt-3 mb-3">
                 <input type="text" placeholder="Search for food..."
@@ -658,10 +659,10 @@ function App() {
                 )}
               </div>
               {/* Mobile Nav Links */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-3">
                 {['home','menu','location','track','profile'].map(page => (
                   <button key={page} onClick={() => { setActivePage(page); setIsMenuOpen(false); }}
-                    className={`py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition text-center ${activePage === page ? 'bg-brand-orange text-white' : 'bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-brand-orange'}`}>
+                    className={`w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition ${activePage === page ? 'bg-brand-orange text-white' : 'bg-gray-100 text-gray-700 hover:bg-orange-50 hover:text-brand-orange'}`}>
                     {page}
                   </button>
                 ))}
@@ -675,69 +676,29 @@ function App() {
         <section ref={homeRef} className={activePage === 'home' ? 'relative min-h-screen w-full overflow-hidden bg-[#f86f1d] text-white' : 'hidden'}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.16),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.12),_transparent_25%)]" />
           <div className="absolute inset-0 bg-[url('/images/landingpage.png')] bg-cover bg-center opacity-20" />
-          <div className="relative z-10">
-            <div className="max-w-7xl mx-auto px-6 pt-6 sm:pt-8">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-white/90 p-2 shadow-xl backdrop-blur-xl">
-                    <img
-                      src="/images/breadwrapz-logo.svg"
-                      alt="Breadwrapz Logo"
-                      className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
-                    />
-                  </div>
-                  <div className="hidden md:block">
-                    <div className="flex items-center gap-3 rounded-full bg-white px-4 py-3 shadow-xl text-gray-900 w-[420px]">
-                      <span className="text-xl">🔍</span>
-                      <input
-                        type="text"
-                        placeholder="Search for food..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onFocus={() => searchTerm && setShowSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                        className="w-full bg-transparent outline-none text-base text-gray-900 placeholder:text-gray-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="hidden md:flex items-center gap-6 text-sm font-semibold tracking-widest">
-                  <button onClick={() => setActivePage('home')} className="transition hover:text-black/90">Home</button>
-                  <button onClick={() => setActivePage('menu')} className="transition hover:text-black/90">Menu</button>
-                  <button onClick={() => setActivePage('location')} className="transition hover:text-black/90">Location</button>
-                  <button onClick={() => setActivePage('track')} className="transition hover:text-black/90">Track</button>
-                  <button
-                    onClick={() => setActivePage('cart')}
-                    className="rounded-full bg-black text-white px-5 py-3 font-black transition hover:bg-gray-900"
-                  >
-                    Cart ({cartCount})
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-6 py-16 lg:py-24">
+          <div className="relative z-10 flex flex-col items-center justify-center min-h-screen">
+            <div className="max-w-7xl mx-auto px-6">
               <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] items-center">
-                <div className="space-y-8">
+                <div className="space-y-8 text-left">
                   <span className="inline-flex items-center rounded-full bg-white/15 px-4 py-2 text-sm uppercase tracking-[0.35em] text-white/90 shadow-inner shadow-black/10">
-                    Get your best food
+                    Get your best food in Abeokuta
                   </span>
-                  <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-tight tracking-tight">
+                  <h1 className="text-6xl sm:text-7xl md:text-8xl font-black leading-tight tracking-tight">
                     Fresh Nigerian meals delivered fast.
                   </h1>
-                  <p className="max-w-xl text-lg sm:text-xl text-white/90">
+                  <p className="max-w-xl text-xl sm:text-2xl text-white/90">
                     Order premium wraps, rice meals and combos with instant checkout, fast delivery, and easy tracking.
                   </p>
                   <div className="flex flex-wrap gap-4">
                     <button
                       onClick={() => setActivePage('menu')}
-                      className="rounded-full bg-black text-white px-8 py-4 text-base font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/20 transition hover:bg-gray-900"
+                      className="rounded-full bg-black text-white px-8 py-4 text-lg font-black uppercase tracking-[0.16em] shadow-2xl shadow-black/20 transition hover:bg-gray-900"
                     >
                       Order Now
                     </button>
                     <button
                       onClick={() => setActivePage('location')}
-                      className="rounded-full border-2 border-white/80 bg-white/10 px-8 py-4 text-base font-black uppercase tracking-[0.16em] text-white transition hover:bg-white/20"
+                      className="rounded-full border-2 border-white/80 bg-white/10 px-8 py-4 text-lg font-black uppercase tracking-[0.16em] text-white transition hover:bg-white/20"
                     >
                       View Location
                     </button>
@@ -749,7 +710,7 @@ function App() {
                     <img
                       src="/images/landingpage.png"
                       alt="Breadwrapz special menu image"
-                      className="w-full h-[520px] object-cover"
+                      className="w-full h-[700px] object-cover"
                     />
                   </div>
                   <div className="absolute top-8 left-8 h-24 w-24 rounded-full bg-white/90 blur-2xl" />
@@ -1111,175 +1072,203 @@ function App() {
           </div>
         </section>
 
-        <section className={activePage === 'profile' ? 'bg-white py-20' : 'hidden'}>
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-10">
-              <p className="text-sm uppercase tracking-[0.4em] text-brand-orange font-bold">Profile</p>
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mt-4">Your customer profile</h2>
-              <p className="text-gray-600 mt-4 max-w-2xl mx-auto">Save your contact details, manage delivery addresses, and review your recent transaction history.</p>
+        <section className={activePage === 'profile' ? 'bg-gradient-to-br from-gray-50 to-white py-20' : 'hidden'}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            {/* Header */}
+            <div className="text-center mb-12">
+              <p className="text-xs uppercase tracking-[0.3em] text-brand-orange font-bold">My Account</p>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 mt-3">Your Profile</h2>
+              <p className="text-gray-600 mt-3 max-w-2xl mx-auto text-sm sm:text-base">Manage your account, view orders, and save delivery addresses.</p>
             </div>
-            <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr]">
-              <div className="rounded-[2rem] bg-white/90 glass p-10 shadow-xl border border-gray-200/50">
-                <h3 className="text-3xl font-black text-brand-orange mb-4">Account</h3>
+
+            {/* Main Grid */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Account Card */}
+              <div className="lg:col-span-1 rounded-3xl bg-white/95 backdrop-blur-sm p-6 sm:p-8 shadow-lg border border-gray-100">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-full bg-brand-orange/10 flex items-center justify-center text-2xl">👤</div>
+                  <h3 className="text-xl font-black text-gray-900">Account</h3>
+                </div>
+
                 {!user ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {authMode === 'register' && (
-                      <input
-                        type="text"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Full name"
-                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
-                      />
+                      <div>
+                        <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Full Name</label>
+                        <input
+                          type="text"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder="Your name"
+                          className="w-full mt-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition"
+                        />
+                      </div>
                     )}
-                    <input
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="Email address"
-                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
-                    />
-                    <input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Mobile number"
-                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
-                    />
-                    <input
-                      type="password"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="Password"
-                      className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
-                    />
-                    {authStatusMessage && <p className="text-sm text-green-600">{authStatusMessage}</p>}
-                    {authError && <p className="text-sm text-red-600">{authError}</p>}
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Email Address</label>
+                      <input
+                        type="email"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        className="w-full mt-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Password</label>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full mt-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition"
+                      />
+                    </div>
+                    {authStatusMessage && <p className="text-xs text-green-600 bg-green-50 p-3 rounded-xl">{authStatusMessage}</p>}
+                    {authError && <p className="text-xs text-red-600 bg-red-50 p-3 rounded-xl">{authError}</p>}
                     <button
                       onClick={() => authenticate(authMode)}
-                      className="w-full rounded-full bg-brand-orange text-white py-4 font-bold uppercase tracking-wider shadow-lg hover:bg-brand-orange-dark transition"
+                      className="w-full mt-4 rounded-2xl bg-brand-orange text-white py-3 font-bold text-sm uppercase tracking-wide shadow-lg hover:bg-brand-orange-dark transition"
                     >
-                      {authMode === 'register' ? 'Register' : 'Login'}
+                      {authMode === 'register' ? 'Create Account' : 'Login'}
                     </button>
                     <button
                       onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                      className="w-full rounded-full border border-brand-orange text-brand-orange py-4 font-bold transition hover:bg-brand-orange/10"
+                      className="w-full rounded-2xl border border-gray-200 text-gray-700 py-3 font-bold text-sm uppercase tracking-wide transition hover:bg-gray-50"
                     >
-                      {authMode === 'login' ? 'Create an account' : 'Already have an account? Login'}
+                      {authMode === 'login' ? 'Create Account' : 'Login'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    <div className="bg-gradient-to-br from-brand-orange/5 to-transparent p-4 rounded-2xl">
+                      <p className="text-xs text-gray-500 font-semibold mb-1">Email</p>
+                      <p className="font-bold text-gray-900 break-all">{customerEmail}</p>
+                    </div>
                     <div>
-                      <label className="block text-sm text-gray-500 mb-2">Full name</label>
+                      <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Full Name</label>
                       <input
                         type="text"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
+                        className="w-full mt-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-500 mb-2">Email</label>
-                      <input
-                        type="email"
-                        value={customerEmail}
-                        readOnly
-                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-gray-100 cursor-not-allowed border-gray-300 transition"
-                      />
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Phone Number</label>
+                        <button
+                          onClick={() => setShowPhoneNumber(!showPhoneNumber)}
+                          className="text-xs text-brand-orange hover:text-brand-orange-dark font-bold"
+                        >
+                          {showPhoneNumber ? '👁️ Hide' : '🔒 Show'}
+                        </button>
+                      </div>
+                      {showPhoneNumber ? (
+                        <input
+                          type="tel"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition"
+                        />
+                      ) : (
+                        <div className="px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm text-gray-500">
+                          {customerPhone ? '••• ••• ' + customerPhone.slice(-4) : 'No phone added'}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm text-gray-500 mb-2">Mobile number</label>
-                      <input
-                        type="tel"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="w-full px-5 py-4 border-2 rounded-3xl text-lg text-gray-900 bg-white focus:outline-none border-gray-300 focus:border-brand-orange transition"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="flex flex-col gap-2 pt-2">
                       <button
                         onClick={saveProfile}
-                        className="flex-1 rounded-full bg-brand-orange text-white py-4 font-bold uppercase tracking-wider shadow-lg hover:bg-brand-orange-dark transition"
+                        className="w-full rounded-2xl bg-brand-orange text-white py-3 font-bold text-sm uppercase tracking-wide shadow-lg hover:bg-brand-orange-dark transition"
                       >
-                        Save profile
+                        Save Changes
                       </button>
                       <button
                         onClick={logout}
-                        className="flex-1 rounded-full border border-brand-orange text-brand-orange py-4 font-bold transition hover:bg-brand-orange/10"
+                        className="w-full rounded-2xl border border-gray-200 text-gray-700 py-3 font-bold text-sm uppercase tracking-wide transition hover:bg-gray-50"
                       >
                         Logout
                       </button>
                     </div>
                   </div>
                 )}
-                <div className="mt-8 rounded-[2rem] bg-gray-50 p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-bold text-gray-900">Saved delivery addresses</h4>
-                    <button
-                      onClick={() => setSavedAddresses([])}
-                      className="text-sm text-brand-orange hover:text-brand-orange-dark font-semibold"
-                    >Clear</button>
+              </div>
+
+              {/* Addresses & Orders Grid */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Saved Addresses */}
+                <div className="rounded-3xl bg-white/95 backdrop-blur-sm p-6 sm:p-8 shadow-lg border border-gray-100">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-full bg-brand-orange/10 flex items-center justify-center text-2xl">📍</div>
+                    <div>
+                      <h4 className="font-black text-gray-900">Delivery Addresses</h4>
+                      <p className="text-xs text-gray-500 mt-1">{savedAddresses.length} saved</p>
+                    </div>
                   </div>
                   {savedAddresses.length === 0 ? (
-                    <p className="text-sm text-gray-500">Save addresses from checkout to reuse them faster.</p>
+                    <div className="rounded-2xl bg-gray-50 p-6 text-center">
+                      <p className="text-sm text-gray-500">Save addresses during checkout to reuse them faster.</p>
+                    </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {savedAddresses.map((address, index) => (
                         <button
                           key={index}
                           onClick={() => setDeliveryLocation(address)}
-                          className="w-full text-left rounded-3xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-700 hover:bg-gray-100 transition"
+                          className="w-full text-left rounded-2xl border border-gray-200 bg-gray-50 hover:border-brand-orange hover:bg-brand-orange/5 px-4 py-3 text-sm text-gray-700 transition"
                         >
                           {address}
                         </button>
                       ))}
+                      <button
+                        onClick={() => setSavedAddresses([])}
+                        className="w-full mt-3 rounded-2xl border border-red-200 text-red-600 py-2 text-sm font-bold uppercase tracking-wide transition hover:bg-red-50"
+                      >
+                        Clear All
+                      </button>
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="rounded-[2rem] bg-white/90 glass p-10 shadow-xl border border-gray-200/50">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-3xl font-black text-brand-orange">Order history</h3>
-                    <p className="text-sm text-gray-500 mt-2">{user ? 'Protected order history from your account.' : 'Recent checkout and transaction records stored locally.'}</p>
+                {/* Order History */}
+                <div className="rounded-3xl bg-white/95 backdrop-blur-sm p-6 sm:p-8 shadow-lg border border-gray-100">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-full bg-brand-orange/10 flex items-center justify-center text-2xl">📦</div>
+                    <div>
+                      <h4 className="font-black text-gray-900">Order History</h4>
+                      <p className="text-xs text-gray-500 mt-1">{historyToShow.length} orders</p>
+                    </div>
                   </div>
-                  {!user && (
-                    <button
-                      onClick={() => setOrderHistory([])}
-                      className="rounded-full border border-brand-orange px-4 py-2 text-sm font-bold text-brand-orange hover:bg-brand-orange/10 transition"
-                    >Clear history</button>
+                  {historyToShow.length === 0 ? (
+                    <div className="rounded-2xl bg-gray-50 p-6 text-center">
+                      <p className="text-sm text-gray-500">No orders yet. Place your first order!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {historyToShow.map((order) => (
+                        <div key={order.reference || order.orderId} className="rounded-2xl border border-gray-200 bg-gray-50 hover:bg-gray-100 p-4 transition">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-500 font-semibold">Order ID</p>
+                              <p className="font-bold text-gray-900 text-sm break-all">{order.orderId}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-xs text-gray-500 font-semibold">Status</p>
+                                <p className="font-bold text-brand-orange text-sm">{order.status}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-gray-500 font-semibold">Total</p>
+                                <p className="font-bold text-gray-900 text-sm">₦{order.amount?.toLocaleString() || 'N/A'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-                {historyToShow.length === 0 ? (
-                  <div className="rounded-3xl bg-gray-50 p-8 text-center text-gray-500">No orders yet. Place an order to see history here.</div>
-                ) : (
-                  <div className="space-y-4">
-                    {historyToShow.map((order) => (
-                      <div key={order.reference || order.orderId} className="rounded-3xl border border-gray-200 p-5 bg-white shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm text-gray-500">Order ID</p>
-                            <p className="font-black text-gray-900">{order.orderId}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Status</p>
-                            <p className="font-black text-brand-orange">{order.status}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Total</p>
-                            <p className="font-black text-gray-900">₦{Number(order.amount).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <p className="text-sm text-gray-500">Delivery fee: ₦{Number(order.deliveryFee || 0).toLocaleString()}</p>
-                          <p className="text-sm text-gray-500">Distance: {order.deliveryDistanceKm ? `${order.deliveryDistanceKm.toFixed(1)} km` : 'Unknown'}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1294,19 +1283,19 @@ function App() {
             <div className="bg-gray-900 p-10 text-white text-center">
               <p className="text-2xl font-bold">Odiolowo street, makun, Sagamu 121102, Ogun State</p>
               <p className="mt-4 text-gray-300">The home of premium Nigerian dishes, ready for your order.</p>
-                  <button
-                    onClick={() => window.open('https://wa.me/12368918149?text='+encodeURIComponent('Hello Breadwrapz Foods, I would like to make a reservation.'))}
-                    className="inline-flex items-center justify-center glass bg-brand-orange/90 hover:bg-brand-orange-dark/90 text-white font-bold py-3 px-6 rounded-full shadow-lg transition backdrop-blur-sm border border-white/20"
-                  >
-                    Reserve on WhatsApp
-                  </button>
-                <button
-                  onClick={() => window.open(`https://maps.google.com/maps?q=${7.717851},${5.253719}&z=15`)}
-                  className="inline-flex items-center justify-center glass bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-6 rounded-full shadow-lg transition backdrop-blur-sm border border-white/20"
-                >
-                  Get Directions
-                </button>
-              </div>
+              <button
+                onClick={() => window.open('https://wa.me/12368918149?text='+encodeURIComponent('Hello Breadwrapz Foods, I would like to make a reservation.'))}
+                className="inline-flex items-center justify-center glass bg-brand-orange/90 hover:bg-brand-orange-dark/90 text-white font-bold py-3 px-6 rounded-full shadow-lg transition backdrop-blur-sm border border-white/20 mt-4"
+              >
+                Reserve on WhatsApp
+              </button>
+              <button
+                onClick={() => window.open(`https://maps.google.com/maps?q=${7.717851},${5.253719}&z=15`)}
+                className="inline-flex items-center justify-center glass bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-6 rounded-full shadow-lg transition backdrop-blur-sm border border-white/20 ml-3 mt-4"
+              >
+                Get Directions
+              </button>
+            </div>
             <div className="h-96 bg-gray-300 overflow-hidden">
               <iframe
                 src="https://maps.google.com/maps?q=7.717851,5.253719&z=15&output=embed"
@@ -1316,7 +1305,7 @@ function App() {
                 allowFullScreen=""
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                  title="Breadwrapz Restaurant Location"
+                title="Breadwrapz Restaurant Location"
               ></iframe>
             </div>
           </div>
