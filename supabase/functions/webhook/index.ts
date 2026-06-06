@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
           method: 'POST',
           headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from: 'Breadwrapz Orders <onboarding@resend.dev>',
+            from: `${Deno.env.get('RESEND_FROM_NAME') || 'Breadwrapz Orders'} <${Deno.env.get('RESEND_FROM') || 'onboarding@resend.dev'}>`,
             to: OWNER_EMAIL,
             subject: `✅ Payment Confirmed — ${order.order_id}`,
             text: `Payment confirmed for order ${order.order_id}.\n\nCustomer: ${order.customer_name || 'N/A'}\nPhone: ${order.customer_phone || order.contact}\nDelivery: ${order.delivery_location}\nTotal: ₦${Number(order.amount).toLocaleString()}\n\nYou can now prepare this order.`,

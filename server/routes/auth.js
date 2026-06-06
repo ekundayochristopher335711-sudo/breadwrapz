@@ -30,8 +30,9 @@ async function sendVerificationEmail(user) {
   const text = `Hello ${user.name},\n\nPlease verify your Breadwrapz account by clicking the link below:\n\n${verificationLink}\n\nIf you did not request this, please ignore this email.\n\nThank you!`;
 
   try {
+    const fromAddress = `${process.env.RESEND_FROM_NAME || 'Breadwrapz'} <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`;
     await resend.emails.send({
-      from: 'Breadwrapz <onboarding@resend.dev>',
+      from: fromAddress,
       to: user.email,
       subject: 'Verify your Breadwrapz account',
       text,

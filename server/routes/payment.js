@@ -40,8 +40,9 @@ function adminKeyValid(provided) {
 async function notifyOwnerNewOrder(order) {
   if (!process.env.RESEND_API_KEY) return;
   const itemList = (order.items || []).map(i => `• ${i.name} — ₦${Number(i.price).toLocaleString()}`).join('\n');
+  const fromAddress = `${process.env.RESEND_FROM_NAME || 'Breadwrapz Orders'} <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`;
   await resend.emails.send({
-    from: 'Breadwrapz Orders <onboarding@resend.dev>',
+    from: fromAddress,
     to: OWNER_EMAIL,
     subject: `New Order ${order.orderId} — ₦${Number(order.amount).toLocaleString()}`,
     text: `New order received!\n\nOrder ID: ${order.orderId}\nCustomer: ${order.customerName || 'N/A'}\nPhone: ${order.customerPhone || order.contact}\nDelivery: ${order.deliveryLocation}\n\nItems:\n${itemList}\n\nTotal: ₦${Number(order.amount).toLocaleString()}\n\nStatus: ${order.status}`,
@@ -50,8 +51,9 @@ async function notifyOwnerNewOrder(order) {
 
 async function notifyOwnerPaymentConfirmed(order) {
   if (!process.env.RESEND_API_KEY) return;
+  const fromAddress2 = `${process.env.RESEND_FROM_NAME || 'Breadwrapz Orders'} <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`;
   await resend.emails.send({
-    from: 'Breadwrapz Orders <onboarding@resend.dev>',
+    from: fromAddress2,
     to: OWNER_EMAIL,
     subject: `✅ Payment Confirmed — ${order.orderId}`,
     text: `Payment confirmed for order ${order.orderId}.\n\nCustomer: ${order.customerName || 'N/A'}\nPhone: ${order.customerPhone || order.contact}\nDelivery: ${order.deliveryLocation}\nTotal: ₦${Number(order.amount).toLocaleString()}\n\nYou can now prepare this order.`,
