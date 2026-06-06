@@ -26,38 +26,62 @@ function calculateDistanceKm(lat1, lng1, lat2, lng2) {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function calculateDeliveryFee(distanceKm) {
-  if (!Number.isFinite(distanceKm) || distanceKm <= 0) return MIN_DELIVERY_FEE;
-  return Math.max(MIN_DELIVERY_FEE, Math.ceil(distanceKm) * DELIVERY_RATE_PER_KM);
-}
-
-function App() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activePage, setActivePage] = useState('home');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [cart, setCart] = useState(() => {
     try {
-      const raw = localStorage.getItem('cart');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
+      const doAuth = async (baseUrl) => {
+        const url = baseUrl ? `${baseUrl.replace(/\/$/, '')}/api/auth/${route}` : `/api/auth/${route}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json().catch(() => ({}));
+        return { res, json };
+      };
+
+      // Try configured API first (if set), otherwise try relative path
+      let result = null;
+      if (API) {
+        result = await doAuth(API);
+      } else {
+        result = await doAuth('');
+      }
+
+      // If configured API failed (not found or server error), fall back to relative path
+      if (result && !result.res.ok && API) {
+        try {
+          const fallback = await doAuth('');
+          if (fallback.res.ok) result = fallback;
+        } catch (e) {
+          // ignore fallback error
+        }
+      }
+
+      if (!result || !result.res.ok) {
+        setAuthError(result?.json?.error || 'Authentication failed.');
+        return;
+      }
+
+      const data = result.json;
+      if (mode === 'register') {
+        setAuthStatusMessage(data.message || 'Verification link sent. Check your email.');
+        setAuthMode('login');
+        setAuthPassword('');
+        return;
+      }
+
+      setAuthToken(data.token);
+      setUser(data.user);
+      setAuthPassword('');
+      setAuthError('');
+      setAuthStatusMessage('');
+      setCustomerName(data.user.name || customerName);
+      setCustomerEmail(data.user.email || customerEmail);
+      setCustomerPhone(data.user.phone || customerPhone);
+      setActivePage('profile');
+    } catch (error) {
+      console.error('auth error:', error);
+      setAuthError('Unable to complete authentication. Please try again.');
     }
-  });
-  const [popularityCounts, setPopularityCounts] = useState(() => {
-    try {
-      const raw = localStorage.getItem('popularityCounts');
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  });
-  const [deliveryLocation, setDeliveryLocation] = useState('');
   const [deliveryCoords, setDeliveryCoords] = useState(null);
   const [deliveryDistanceKm, setDeliveryDistanceKm] = useState(null);
   const [deliveryFee, setDeliveryFee] = useState(MIN_DELIVERY_FEE);
