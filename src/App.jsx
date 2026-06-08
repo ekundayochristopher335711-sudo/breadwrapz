@@ -75,6 +75,10 @@ function App() {
   const [authStatusMessage, setAuthStatusMessage] = useState('');
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [approvedReviews, setApprovedReviews] = useState([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [backendOrderHistory, setBackendOrderHistory] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState(() => {
@@ -218,6 +222,7 @@ function App() {
   }, [popularityCounts, cart, savedAddresses, orderHistory, user, authToken, customerName, customerEmail, customerPhone]);
 
   useEffect(() => {
+    loadApprovedReviews();
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) applySession(session);
     });
@@ -473,6 +478,36 @@ function App() {
       setPasswordRecoveryMode(false);
       setNewPassword('');
       showToast('Password updated successfully!');
+    }
+  };
+
+  const loadApprovedReviews = async () => {
+    const { data } = await supabase
+      .from('reviews')
+      .select('id, user_name, rating, comment, created_at')
+      .eq('approved', true)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setApprovedReviews(data);
+  };
+
+  const submitReview = async () => {
+    if (!user) return;
+    if (!reviewComment.trim()) { showToast('Please write a comment', 'error'); return; }
+    setReviewSubmitting(true);
+    const { error } = await supabase.from('reviews').insert({
+      user_id: user.userId,
+      user_name: customerName || customerEmail.split('@')[0],
+      rating: reviewRating,
+      comment: reviewComment.trim(),
+    });
+    setReviewSubmitting(false);
+    if (error) {
+      showToast('Failed to submit review', 'error');
+    } else {
+      showToast('Review submitted! Awaiting approval.');
+      setReviewComment('');
+      setReviewRating(5);
     }
   };
 
@@ -842,28 +877,78 @@ function App() {
               <h2 className="text-4xl md:text-5xl font-black text-gray-900 mt-4">What our customers say</h2>
               <p className="text-gray-500 mt-4 max-w-xl mx-auto">Real people, real orders, real satisfaction.</p>
             </div>
-            <div className="grid gap-6 md:grid-cols-3">
-              {[
-                { name: 'Adunola Balogun', text: 'The Jollof wrap is something else! Ordered twice this week already. Fast delivery and still hot when it arrived.', location: 'Abeokuta' },
-                { name: 'Tunde Adesanya', text: 'Fast delivery, hot food, easy tracking. This is how a restaurant app should work. I tracked my order every step of the way.', location: 'Sagamu' },
-                { name: 'Chisom Eze', text: 'Love the combo meals. The rice is perfectly seasoned every time. Best food delivery app in the area by far.', location: 'Abeokuta' },
-              ].map((review) => (
-                <div key={review.name} className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-4">
-                  <div className="flex gap-1 text-brand-orange text-lg">
-                    {'★★★★★'}
-                  </div>
-                  <p className="text-gray-700 text-base leading-relaxed flex-1">"{review.text}"</p>
-                  <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                    <div className="w-10 h-10 rounded-full bg-brand-orange/10 flex items-center justify-center font-black text-brand-orange text-sm">
-                      {review.name.charAt(0)}
+
+            {/* Approved reviews grid */}
+            {approvedReviews.length === 0 ? (
+              <p className="text-center text-gray-400 py-8">No reviews yet — be the first!</p>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-3 mb-12">
+                {approvedReviews.map((review) => (
+                  <div key={review.id} className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 flex flex-col gap-4">
+                    <div className="flex gap-0.5 text-brand-orange text-lg">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} className={i < review.rating ? 'text-brand-orange' : 'text-gray-200'}>★</span>
+                      ))}
                     </div>
-                    <div>
-                      <p className="font-black text-gray-900 text-sm">{review.name}</p>
-                      <p className="text-xs text-gray-400">{review.location}</p>
+                    <p className="text-gray-700 text-base leading-relaxed flex-1">"{review.comment}"</p>
+                    <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                      <div className="w-10 h-10 rounded-full bg-brand-orange/10 flex items-center justify-center font-black text-brand-orange text-sm">
+                        {review.user_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-black text-gray-900 text-sm">{review.user_name}</p>
+                        <p className="text-xs text-gray-400">{new Date(review.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+
+            {/* Review submission */}
+            <div className="max-w-xl mx-auto">
+              {user ? (
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+                  <h3 className="font-black text-gray-900 text-lg mb-5">Leave a Review</h3>
+                  {/* Star selector */}
+                  <div className="flex gap-1 mb-4">
+                    {[1,2,3,4,5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setReviewRating(star)}
+                        className={`text-3xl transition ${star <= reviewRating ? 'text-brand-orange' : 'text-gray-200 hover:text-brand-orange/50'}`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Share your experience..."
+                    rows={3}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-sm text-gray-900 bg-gray-50 focus:outline-none focus:border-brand-orange focus:bg-white transition resize-none"
+                  />
+                  <button
+                    onClick={submitReview}
+                    disabled={reviewSubmitting}
+                    className="mt-3 w-full rounded-2xl bg-brand-orange text-white py-3 font-bold text-sm uppercase tracking-wide shadow-lg hover:bg-brand-orange-dark disabled:opacity-60 transition"
+                  >
+                    {reviewSubmitting ? 'Submitting...' : 'Submit Review'}
+                  </button>
+                  <p className="text-xs text-gray-400 mt-2 text-center">Reviews are reviewed before being published.</p>
                 </div>
-              ))}
+              ) : (
+                <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 text-center">
+                  <p className="text-gray-500 text-sm mb-4">Sign in to leave a review</p>
+                  <button
+                    onClick={() => { setActivePage('profile'); setAuthMode('login'); }}
+                    className="px-6 py-3 rounded-2xl bg-brand-orange text-white font-bold text-sm uppercase tracking-wide hover:bg-brand-orange-dark transition"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
