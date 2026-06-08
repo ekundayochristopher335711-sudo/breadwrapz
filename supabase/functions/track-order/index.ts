@@ -8,7 +8,11 @@ Deno.serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
-    const orderId = url.searchParams.get('orderId');
+    // Support both path param (/track-order/BRD-123) and query param (?orderId=BRD-123)
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const orderId = pathParts[pathParts.length - 1] !== 'track-order'
+      ? pathParts[pathParts.length - 1]
+      : url.searchParams.get('orderId');
 
     if (!orderId) {
       return json({ error: 'Order ID is required.' }, 400);

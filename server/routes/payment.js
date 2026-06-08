@@ -8,9 +8,9 @@ import { createOrder, getOrder, getOrderByReference, updateOrder, getAllOrders }
 import { calculateTotal, calculateDeliveryFee, DELIVERY_FEE } from '../data/menuPrices.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
+const OWNER_EMAIL = process.env.OWNER_EMAIL || 'breadwrapzfoods@gmail.com';
 const MAX_ORDER_AMOUNT = 500000; // ₦500,000 hard cap per order
-const JWT_SECRET = process.env.JWT_SECRET || 'breadwrapz_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function getUserIdFromToken(req) {
   const authHeader = req.headers.authorization;
@@ -76,6 +76,14 @@ const verifyLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please wait and try again.' },
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin requests. Please wait and try again.' },
 });
 
 router.post('/initialize-payment', checkoutLimiter, async (req, res) => {
@@ -227,7 +235,7 @@ router.get('/track-order/:orderId', async (req, res) => {
   }
 });
 
-router.get('/admin/orders', async (req, res) => {
+router.get('/admin/orders', adminLimiter, async (req, res) => {
   if (!adminKeyValid(req.headers['x-admin-key'])) {
     return res.status(401).json({ error: 'Unauthorised' });
   }
@@ -235,7 +243,7 @@ router.get('/admin/orders', async (req, res) => {
   return res.json(orders);
 });
 
-router.post('/admin/orders/:orderId/status', async (req, res) => {
+router.post('/admin/orders/:orderId/status', adminLimiter, async (req, res) => {
   if (!adminKeyValid(req.headers['x-admin-key'])) {
     return res.status(401).json({ error: 'Unauthorised' });
   }

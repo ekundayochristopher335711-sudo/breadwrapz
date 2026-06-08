@@ -4,11 +4,12 @@ const API = import.meta.env.VITE_API_URL || '';
 const STATUSES = ['Order Received', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'];
 
 export default function Admin() {
-  const [key, setKey] = useState(() => sessionStorage.getItem('adminKey') || '');
+  const [key, setKey] = useState('');
   const [input, setInput] = useState('');
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState('');
   const [updating, setUpdating] = useState(null);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   const fetchOrders = useCallback(async (adminKey) => {
     try {
@@ -16,6 +17,7 @@ export default function Admin() {
         headers: { 'x-admin-key': adminKey },
       });
       if (res.status === 401) { setError('Wrong password.'); return; }
+      if (!res.ok) { setError('Server error. Try again.'); return; }
       const data = await res.json();
       setOrders(data);
       setError('');
@@ -31,9 +33,26 @@ export default function Admin() {
     return () => clearInterval(interval);
   }, [key, fetchOrders]);
 
-  const login = () => {
-    sessionStorage.setItem('adminKey', input);
-    setKey(input);
+  const login = async () => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) { setError('Please enter the admin password.'); return; }
+    setError('');
+    setLoggingIn(true);
+    try {
+      const res = await fetch(`${API}/admin-orders`, {
+        headers: { 'x-admin-key': trimmedInput },
+      });
+      if (res.status === 401) { setError('Wrong password.'); return; }
+      if (!res.ok) { setError('Could not connect to server.'); return; }
+      const data = await res.json();
+      sessionStorage.setItem('adminKey', trimmedInput);
+      setKey(trimmedInput);
+      setOrders(data);
+    } catch {
+      setError('Could not connect to server.');
+    } finally {
+      setLoggingIn(false);
+    }
   };
 
   const updateStatus = async (orderId, status) => {
@@ -55,22 +74,23 @@ export default function Admin() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm">
-          <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-16 mx-auto mb-6" />
+          <img src="/images/logo.png" alt="Breadwrapz" className="h-16 mx-auto mb-6 object-contain" />
           <h2 className="text-2xl font-black text-center text-gray-900 mb-6">Admin Login</h2>
           <input
             type="password"
             placeholder="Enter admin password"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && login()}
+            onKeyDown={(e) => e.key === 'Enter' && !loggingIn && login()}
             className="w-full px-5 py-4 border-2 border-gray-300 rounded-2xl text-gray-900 focus:outline-none focus:border-orange-500 mb-4"
           />
           {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
           <button
             onClick={login}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-4 rounded-2xl transition"
+            disabled={loggingIn}
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-black py-4 rounded-2xl transition"
           >
-            Login
+            {loggingIn ? 'Checking...' : 'Login'}
           </button>
         </div>
       </div>
@@ -82,7 +102,7 @@ export default function Admin() {
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <img src="/images/breadwrapz-logo.svg" alt="Breadwrapz" className="h-12" />
+            <img src="/images/logo.png" alt="Breadwrapz" className="h-12 object-contain" />
             <h1 className="text-3xl font-black text-gray-900">Orders</h1>
           </div>
           <div className="flex items-center gap-3">

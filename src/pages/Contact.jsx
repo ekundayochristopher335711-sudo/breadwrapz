@@ -27,8 +27,8 @@ const Contact = () => {
                 <div>
                   <h4 className="font-bold text-gray-800">Phone / WhatsApp</h4>
                   <p className="text-gray-600">
-                    <a href="https://wa.me/12368918149" className="text-item-red hover:underline">
-                      +1 236 891 8149
+                    <a href="https://wa.me/2348086900533" className="text-item-red hover:underline">
+                      0808 690 0533
                     </a>
                   </p>
                   <p className="text-sm text-gray-500 mt-1">Available 24/7</p>
@@ -41,8 +41,8 @@ const Contact = () => {
                 <div>
                   <h4 className="font-bold text-gray-800">Email</h4>
                   <p className="text-gray-600">
-                      <a href="mailto:info@breadwrapz.com" className="text-item-red hover:underline">
-                        info@breadwrapz.com
+                      <a href="mailto:breadwrapzfoods@gmail.com" className="text-item-red hover:underline">
+                        breadwrapzfoods@gmail.com
                     </a>
                   </p>
                 </div>
@@ -54,8 +54,9 @@ const Contact = () => {
                 <div>
                   <h4 className="font-bold text-gray-800">Address</h4>
                   <p className="text-gray-600">
-                    123 Food Street<br />
-                    Lagos, Nigeria
+                    3 Adeshina Street, Delight Ventures Complex<br />
+                    Along Idi Mango Road, Adigbe<br />
+                    Abeokuta 110104, Ogun State, Nigeria
                   </p>
                 </div>
               </div>

@@ -3,7 +3,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { calculateTotal, calculateDeliveryFee, DELIVERY_FEE } from '../_shared/menuPrices.ts';
 
 const MAX_ORDER_AMOUNT = 500000;
-const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
+const OWNER_EMAIL = Deno.env.get('OWNER_EMAIL') || 'breadwrapzfoods@gmail.com';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {

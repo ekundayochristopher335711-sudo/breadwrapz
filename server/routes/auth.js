@@ -2,12 +2,29 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { Resend } from 'resend';
 import { createUser, getUserByEmailWithPassword, getUserByEmail, getUserByVerificationToken, getUserById, updateUser } from '../data/userStore.js';
 import { getOrdersByUserId } from '../data/orderStore.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'breadwrapz_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please wait 15 minutes and try again.' },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registration attempts. Please wait before trying again.' },
+});
 const JWT_EXPIRES_IN = '7d';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -58,7 +75,7 @@ export function authenticateToken(req, res, next) {
   }
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
     if (!name?.trim() || !email?.trim() || !phone?.trim() || !password?.trim()) {
@@ -96,7 +113,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email?.trim() || !password?.trim()) {

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const OWNER_EMAIL = 'ekundayochristopher335711@gmail.com';
+const OWNER_EMAIL = Deno.env.get('OWNER_EMAIL') || 'breadwrapzfoods@gmail.com';
 
 Deno.serve(async (req: Request) => {
   const secret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');

@@ -21,6 +21,16 @@ if (!process.env.MONGODB_URI) {
   process.exit(1);
 }
 
+if (!process.env.JWT_SECRET) {
+  console.error('Missing JWT_SECRET in environment.');
+  process.exit(1);
+}
+
+if (!process.env.ADMIN_KEY) {
+  console.error('Missing ADMIN_KEY in environment.');
+  process.exit(1);
+}
+
 app.use(cors({ origin: [FRONTEND_URL, 'https://breadwrapz2.netlify.app'] }));
 app.use(express.json({
   verify: (req, res, buf) => {
