@@ -75,6 +75,7 @@ function App() {
   const [authStatusMessage, setAuthStatusMessage] = useState('');
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [menuItems, setMenuItems] = useState(menuDataNoImages);
   const [approvedReviews, setApprovedReviews] = useState([]);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -166,7 +167,7 @@ function App() {
 
   const displayNavbar = true;
 
-  const categories = useMemo(() => ['All', ...new Set(menuDataNoImages.map(item => item.category))], []);
+  const categories = useMemo(() => ['All', ...new Set(menuItems.map(item => item.category))], [menuItems]);
 
   const orderStatusSteps = ['Order Received', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'];
   const mockOrderData = {
@@ -191,8 +192,8 @@ function App() {
   const filteredMenuData = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
     const byCategory = selectedCategory === 'All'
-      ? menuDataNoImages
-      : menuDataNoImages.filter(item => item.category === selectedCategory);
+      ? menuItems
+      : menuItems.filter(item => item.category === selectedCategory);
 
     if (!normalized) return byCategory;
 
@@ -201,7 +202,7 @@ function App() {
       item.desc.toLowerCase().includes(normalized) ||
       item.category.toLowerCase().includes(normalized)
     );
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, menuItems]);
 
   const cartCount = useMemo(() => cart.reduce((sum, item) => sum + (item.quantity || 1), 0), [cart]);
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0), [cart]);
@@ -222,6 +223,7 @@ function App() {
   }, [popularityCounts, cart, savedAddresses, orderHistory, user, authToken, customerName, customerEmail, customerPhone]);
 
   useEffect(() => {
+    loadMenuItems();
     loadApprovedReviews();
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) applySession(session);
@@ -478,6 +480,21 @@ function App() {
       setPasswordRecoveryMode(false);
       setNewPassword('');
       showToast('Password updated successfully!');
+    }
+  };
+
+  const loadMenuItems = async () => {
+    const { data } = await supabase.from('menu_items').select('*').order('id');
+    if (data && data.length > 0) {
+      setMenuItems(data.map(item => ({
+        id: item.id,
+        name: item.name,
+        desc: item.description || '',
+        price: item.price,
+        category: item.category,
+        available: item.available,
+        image: item.image_url || '',
+      })));
     }
   };
 

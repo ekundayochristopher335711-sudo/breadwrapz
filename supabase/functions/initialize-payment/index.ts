@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { calculateTotal, calculateDeliveryFee, DELIVERY_FEE } from '../_shared/menuPrices.ts';
+import { calculateDeliveryFee, DELIVERY_FEE, calculatePaystackFee } from '../_shared/menuPrices.ts';
 
 const MAX_ORDER_AMOUNT = 500000;
 const OWNER_EMAIL = Deno.env.get('OWNER_EMAIL') || 'breadwrapzfoods@gmail.com';
@@ -27,7 +27,15 @@ Deno.serve(async (req: Request) => {
         ? calculateDeliveryFee(parsedDistance)
         : DELIVERY_FEE;
 
-    const amount = calculateTotal(items, computedDeliveryFee);
+    // Fetch authoritative prices from database
+    const supabaseForPrices = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: dbItems } = await supabaseForPrices.from('menu_items').select('id, price');
+    const MENU_PRICES: Record<number, number> = {};
+    (dbItems || []).forEach((i: any) => { MENU_PRICES[i.id] = i.price; });
+
+    const subtotal = (items as any[]).reduce((sum: number, item: any) => sum + (MENU_PRICES[item.id] ?? 0) * (item.quantity || 1), 0);
+    const withDelivery = subtotal + computedDeliveryFee;
+    const amount = withDelivery + calculatePaystackFee(withDelivery);
 
     if (amount <= 0) return json({ error: 'Order total must be greater than zero.' }, 400);
     if (amount > MAX_ORDER_AMOUNT) return json({ error: 'Order total exceeds maximum allowed amount.' }, 400);
@@ -36,10 +44,7 @@ Deno.serve(async (req: Request) => {
     const orderId = `BRD-${Date.now()}`;
     const reference = orderId;
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+    const supabase = supabaseForPrices;
 
     // Extract user ID from JWT if logged in
     let userId: string | null = null;
