@@ -492,7 +492,10 @@ function App() {
   };
 
   const submitReview = async () => {
-    if (!user) return;
+    if (!user) {
+      showToast('Please log in to submit a review', 'error');
+      return;
+    }
     if (!reviewComment.trim()) { showToast('Please write a comment', 'error'); return; }
     setReviewSubmitting(true);
     const { error } = await supabase.from('reviews').insert({
@@ -503,7 +506,8 @@ function App() {
     });
     setReviewSubmitting(false);
     if (error) {
-      showToast('Failed to submit review', 'error');
+      console.error('Review submission error:', error);
+      showToast(`Failed to submit review: ${error.message}`, 'error');
     } else {
       showToast('Review submitted! Awaiting approval.');
       setReviewComment('');

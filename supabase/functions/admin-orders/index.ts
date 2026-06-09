@@ -52,6 +52,7 @@ Deno.serve(async (req: Request) => {
     const { data: orders, error } = await supabase
       .from('orders')
       .select('*')
+      .eq('payment_verified', true)
       .order('created_at', { ascending: false });
 
     if (error) return json({ error: error.message }, 500);

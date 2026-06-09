@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { menuDataNoImages } from '../menuData';
 
 const API = import.meta.env.VITE_API_URL || '';
 const STATUSES = ['Order Received', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'];
@@ -13,6 +14,9 @@ export default function Admin() {
   const [tab, setTab] = useState('orders');
   const [pendingReviews, setPendingReviews] = useState([]);
   const [reviewAction, setReviewAction] = useState(null);
+  const [foodAvailability, setFoodAvailability] = useState([]);
+  const [updatingFood, setUpdatingFood] = useState(null);
+  const [foodUnavailableUntil, setFoodUnavailableUntil] = useState({});
 
   const fetchOrders = useCallback(async (adminKey) => {
     try {
@@ -38,6 +42,15 @@ export default function Admin() {
     } catch { /* silent */ }
   }, []);
 
+  const fetchFoodAvailability = useCallback(async (adminKey) => {
+    try {
+      const res = await fetch(`${API}/admin-food-availability`, {
+        headers: { 'x-admin-key': adminKey },
+      });
+      if (res.ok) setFoodAvailability(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
   const handleReview = async (id, action) => {
     setReviewAction(id);
     try {
@@ -51,13 +64,28 @@ export default function Admin() {
     setReviewAction(null);
   };
 
+  const updateFoodAvailability = async (foodId, foodName, isAvailable) => {
+    setUpdatingFood(foodId);
+    try {
+      const unavailableUntil = !isAvailable ? foodUnavailableUntil[foodId] : null;
+      await fetch(`${API}/admin-food-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+        body: JSON.stringify({ foodId, foodName, isAvailable, unavailableUntil }),
+      });
+      await fetchFoodAvailability(key);
+    } catch { alert('Failed to update food availability.'); }
+    setUpdatingFood(null);
+  };
+
   useEffect(() => {
     if (!key) return;
     fetchOrders(key);
     fetchReviews(key);
-    const interval = setInterval(() => { fetchOrders(key); fetchReviews(key); }, 30000);
+    fetchFoodAvailability(key);
+    const interval = setInterval(() => { fetchOrders(key); fetchReviews(key); fetchFoodAvailability(key); }, 30000);
     return () => clearInterval(interval);
-  }, [key, fetchOrders, fetchReviews]);
+  }, [key, fetchOrders, fetchReviews, fetchFoodAvailability]);
 
   const login = async () => {
     const trimmedInput = input.trim();
@@ -124,16 +152,17 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10">
+    <div className="min-h-screen bg-gray-50 pb-24 md:pb-10 px-4 md:py-10 pt-10">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        {/* Header - Hidden on mobile */}
+        <div className="hidden md:flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <img src="/images/logo.png" alt="Breadwrapz" className="h-12 object-contain" />
             <h1 className="text-3xl font-black text-gray-900">Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { fetchOrders(key); fetchReviews(key); }}
+              onClick={() => { fetchOrders(key); fetchReviews(key); fetchFoodAvailability(key); }}
               className="px-5 py-2 bg-orange-500 text-white rounded-full font-bold hover:bg-orange-600 transition"
             >
               Refresh
@@ -147,8 +176,29 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8">
+        {/* Mobile Header */}
+        <div className="md:hidden flex items-center justify-between mb-6 fixed top-0 left-0 right-0 bg-white shadow-sm z-40 px-4 py-3">
+          <img src="/images/logo.png" alt="Breadwrapz" className="h-10 object-contain" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { fetchOrders(key); fetchReviews(key); fetchFoodAvailability(key); }}
+              className="p-2 bg-orange-100 text-orange-500 rounded-full hover:bg-orange-200 transition"
+              title="Refresh"
+            >
+              ↻
+            </button>
+            <button
+              onClick={() => { sessionStorage.removeItem('adminKey'); setKey(''); setOrders([]); setPendingReviews([]); }}
+              className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition"
+              title="Logout"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop Tabs */}
+        <div className="hidden md:flex gap-2 mb-8 flex-wrap">
           <button
             onClick={() => setTab('orders')}
             className={`px-6 py-2.5 rounded-full font-bold text-sm transition ${tab === 'orders' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-orange-50'}`}
@@ -160,6 +210,12 @@ export default function Admin() {
             className={`px-6 py-2.5 rounded-full font-bold text-sm transition ${tab === 'reviews' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-orange-50'}`}
           >
             Reviews {pendingReviews.length > 0 && <span className="ml-1 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-xs">{pendingReviews.length} pending</span>}
+          </button>
+          <button
+            onClick={() => setTab('food')}
+            className={`px-6 py-2.5 rounded-full font-bold text-sm transition ${tab === 'food' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-orange-50'}`}
+          >
+            Food Availability
           </button>
         </div>
 
@@ -276,6 +332,119 @@ export default function Admin() {
             ))}
           </div>
         )}
+
+        {tab === 'food' && (
+          <div className="space-y-4">
+            {menuDataNoImages.length === 0 ? (
+              <div className="bg-white rounded-3xl p-16 text-center shadow">
+                <p className="text-gray-500 text-lg">No food items available.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {menuDataNoImages.map((food) => {
+                  const availability = foodAvailability.find(f => f.food_id === food.id);
+                  const isAvailable = availability ? availability.is_available : food.available;
+                  const unavailableUntil = availability?.unavailable_until;
+                  
+                  return (
+                    <div key={food.id} className="bg-white rounded-3xl shadow p-6 border border-gray-100">
+                      <div className="mb-4">
+                        <p className="font-black text-gray-900 text-sm">{food.name}</p>
+                        <p className="text-xs text-gray-500 mt-1">{food.category}</p>
+                        <p className="text-gray-600 text-sm mt-2">₦{Number(food.price).toLocaleString()}</p>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                          <span className={`text-sm font-bold ${isAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                            {isAvailable ? 'Available' : 'Unavailable'}
+                          </span>
+                        </div>
+                        {unavailableUntil && !isAvailable && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Available at: {new Date(unavailableUntil).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {!isAvailable && (
+                          <div>
+                            <label className="text-xs font-bold text-gray-600 block mb-2">Set available time</label>
+                            <input
+                              type="datetime-local"
+                              value={foodUnavailableUntil[food.id] || ''}
+                              onChange={(e) => setFoodUnavailableUntil({
+                                ...foodUnavailableUntil,
+                                [food.id]: e.target.value,
+                              })}
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateFoodAvailability(food.id, food.name, !isAvailable)}
+                            disabled={updatingFood === food.id}
+                            className={`flex-1 px-3 py-2 rounded-xl text-sm font-bold transition ${
+                              isAvailable
+                                ? 'bg-orange-100 hover:bg-orange-200 text-orange-600'
+                                : 'bg-green-100 hover:bg-green-200 text-green-600'
+                            } disabled:opacity-60`}
+                          >
+                            {updatingFood === food.id ? 'Updating...' : (isAvailable ? 'Mark Unavailable' : 'Mark Available')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl z-50">
+        <div className="flex justify-around items-center max-w-md mx-auto w-full">
+          <button
+            onClick={() => setTab('orders')}
+            className={`flex-1 flex flex-col items-center justify-center py-3 px-2 transition ${
+              tab === 'orders'
+                ? 'text-orange-500 border-t-2 border-orange-500'
+                : 'text-gray-600 border-t-2 border-transparent hover:text-orange-500'
+            }`}
+          >
+            <span className="text-xl mb-1">📋</span>
+            <span className="text-xs font-bold">Orders</span>
+            {orders.length > 0 && <span className="text-xs bg-orange-500 text-white rounded-full px-1.5 py-0.5 mt-1">{orders.length}</span>}
+          </button>
+          <button
+            onClick={() => setTab('reviews')}
+            className={`flex-1 flex flex-col items-center justify-center py-3 px-2 transition ${
+              tab === 'reviews'
+                ? 'text-orange-500 border-t-2 border-orange-500'
+                : 'text-gray-600 border-t-2 border-transparent hover:text-orange-500'
+            }`}
+          >
+            <span className="text-xl mb-1">⭐</span>
+            <span className="text-xs font-bold">Reviews</span>
+            {pendingReviews.length > 0 && <span className="text-xs bg-orange-500 text-white rounded-full px-1.5 py-0.5 mt-1">{pendingReviews.length}</span>}
+          </button>
+          <button
+            onClick={() => setTab('food')}
+            className={`flex-1 flex flex-col items-center justify-center py-3 px-2 transition ${
+              tab === 'food'
+                ? 'text-orange-500 border-t-2 border-orange-500'
+                : 'text-gray-600 border-t-2 border-transparent hover:text-orange-500'
+            }`}
+          >
+            <span className="text-xl mb-1">🍽️</span>
+            <span className="text-xs font-bold">Food</span>
+          </button>
+        </div>
       </div>
     </div>
   );
