@@ -182,12 +182,12 @@ function App() {
     if (!normalized) return [];
 
     return [...new Set(
-      menuDataNoImages
+      menuItems
         .filter(item => item.name.toLowerCase().includes(normalized))
         .slice(0, 6)
         .map(item => item.name)
     )];
-  }, [searchTerm]);
+  }, [searchTerm, menuItems]);
 
   const filteredMenuData = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -291,10 +291,10 @@ function App() {
   }, [user]);
 
   const topItems = useMemo(() => {
-    const itemsWithCount = menuDataNoImages.map(i => ({ ...i, orders: popularityCounts[i.id] || 0 }));
+    const itemsWithCount = menuItems.map(i => ({ ...i, orders: popularityCounts[i.id] || 0 }));
     itemsWithCount.sort((a, b) => b.orders - a.orders || (b.available === a.available ? 0 : (a.available ? -1 : 1)));
     return itemsWithCount.slice(0, 3);
-  }, [popularityCounts]);
+  }, [popularityCounts, menuItems]);
 
   const historyToShow = user ? backendOrderHistory : orderHistory;
 
@@ -1045,7 +1045,7 @@ function App() {
                 {/* Cart Items Grid */}
                 <div className="grid gap-6 sm:grid-cols-2">
                   {cart.map((item) => {
-                    const menuItem = menuDataNoImages.find(m => m.id === item.id);
+                    const menuItem = menuItems.find(m => m.id === item.id);
                     return (
                       <div key={item.id} className="bg-white/90 glass rounded-[2rem] overflow-hidden shadow-xl border border-gray-200/50 hover:shadow-2xl transition backdrop-blur-sm">
                         {/* Product Image */}

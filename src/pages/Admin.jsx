@@ -30,6 +30,7 @@ export default function Admin() {
   const [editForm, setEditForm] = useState(BLANK_FORM);
   const [togglingId, setTogglingId] = useState(null);
   const [unavailableUntil, setUnavailableUntil] = useState({});
+  const [uploading, setUploading] = useState(false);
 
   // ── Fetchers ──────────────────────────────────────────────────────────────
   const fetchOrders = useCallback(async (adminKey) => {
@@ -118,6 +119,18 @@ export default function Admin() {
     const data = await res.json();
     if (!res.ok) { setMenuError(data.error || 'Action failed.'); return false; }
     return true;
+  };
+
+  const uploadImage = async (file, onDone) => {
+    setUploading(true); setMenuError('');
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const res = await fetch(`${API}/admin-upload`, { method: 'POST', headers: { 'x-admin-key': key }, body: fd });
+      const data = await res.json();
+      if (data.url) onDone(data.url);
+      else setMenuError(data.error || 'Upload failed');
+    } catch { setMenuError('Upload failed'); }
+    setUploading(false);
   };
 
   const addItem = async () => {
@@ -334,8 +347,15 @@ export default function Admin() {
                     className="px-4 py-3 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-orange-500">
                     {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                   </select>
-                  <input placeholder="Image URL (optional)" value={addForm.image_url} onChange={e => setAddForm(f => ({ ...f, image_url: e.target.value }))}
-                    className="px-4 py-3 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-orange-500" />
+                  <div className="flex gap-2 items-center">
+                    <input placeholder="Image URL (optional)" value={addForm.image_url} onChange={e => setAddForm(f => ({ ...f, image_url: e.target.value }))}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-orange-500" />
+                    <label className={`flex-shrink-0 px-3 py-3 rounded-2xl text-sm font-bold cursor-pointer transition ${uploading ? 'bg-gray-100 text-gray-400' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'}`}>
+                      {uploading ? '...' : '📷'}
+                      <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f, url => setAddForm(p => ({ ...p, image_url: url }))); e.target.value = ''; }} />
+                    </label>
+                  </div>
                   <input placeholder="Description (optional)" value={addForm.description} onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))}
                     className="px-4 py-3 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-orange-500 sm:col-span-2" />
                 </div>
@@ -370,8 +390,15 @@ export default function Admin() {
                         </div>
                         <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500" placeholder="Description" />
-                        <input value={editForm.image_url} onChange={e => setEditForm(f => ({ ...f, image_url: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500" placeholder="Image URL" />
+                        <div className="flex gap-2 items-center">
+                          <input value={editForm.image_url} onChange={e => setEditForm(f => ({ ...f, image_url: e.target.value }))}
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500" placeholder="Image URL" />
+                          <label className={`flex-shrink-0 px-3 py-2 rounded-xl text-sm font-bold cursor-pointer transition ${uploading ? 'bg-gray-100 text-gray-400' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'}`}>
+                            {uploading ? '...' : '📷'}
+                            <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f, url => setEditForm(p => ({ ...p, image_url: url }))); e.target.value = ''; }} />
+                          </label>
+                        </div>
                         <div className="flex gap-2">
                           <button onClick={saveEdit} className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition">Save</button>
                           <button onClick={() => setEditingId(null)} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition">Cancel</button>
