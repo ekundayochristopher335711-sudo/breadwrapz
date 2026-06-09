@@ -47,6 +47,28 @@ Set these for local development and deployment:
 4. Deploy the frontend as a static site to Supabase.
 5. Keep the backend hosted on a Node/Mongo-capable service unless you migrate the Express server to Supabase Edge Functions.
 
+### Run the database migrations
+
+This repo already includes migration files for the reviews and food availability tables.
+To apply them, first log in to the Supabase CLI and then push the schema:
+
+```bash
+npm run supabase:login
+npm run supabase:migrate
+```
+
+If you only need to create the missing review and availability tables, `npm run supabase:migrate` will execute the SQL under `supabase/migrations`.
+
+### Deploy the admin functions
+
+After the migration, deploy the admin functions with:
+
+```bash
+npm run supabase:deploy:functions
+```
+
+This will deploy the `admin-reviews` and `admin-food-availability` functions.
+
 ## Verification flow
 
 - Registering now sends a verification email.

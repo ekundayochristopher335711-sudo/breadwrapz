@@ -8,7 +8,10 @@
     "dev": "vite",
     "dev:server": "node server/index.js",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "supabase:login": "npx supabase login",
+    "supabase:migrate": "npx supabase db push",
+    "supabase:deploy:functions": "npx supabase functions deploy admin-reviews admin-food-availability"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

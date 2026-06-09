@@ -15,6 +15,8 @@ export default function Admin() {
   const [pendingReviews, setPendingReviews] = useState([]);
   const [reviewAction, setReviewAction] = useState(null);
   const [foodAvailability, setFoodAvailability] = useState([]);
+  const [foodError, setFoodError] = useState('');
+  const [foodMessage, setFoodMessage] = useState('');
   const [updatingFood, setUpdatingFood] = useState(null);
   const [foodUnavailableUntil, setFoodUnavailableUntil] = useState({});
 
@@ -47,8 +49,16 @@ export default function Admin() {
       const res = await fetch(`${API}/admin-food-availability`, {
         headers: { 'x-admin-key': adminKey },
       });
-      if (res.ok) setFoodAvailability(await res.json());
-    } catch { /* silent */ }
+      if (res.ok) {
+        setFoodAvailability(await res.json());
+        setFoodError('');
+      } else {
+        const data = await res.json().catch(() => null);
+        setFoodError(data?.error || 'Failed to load food availability.');
+      }
+    } catch (err) {
+      setFoodError('Unable to fetch food availability.');
+    }
   }, []);
 
   const handleReview = async (id, action) => {
@@ -65,16 +75,35 @@ export default function Admin() {
   };
 
   const updateFoodAvailability = async (foodId, foodName, isAvailable) => {
+    const selectedTime = foodUnavailableUntil[foodId];
+    const defaultTime = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16);
+    const unavailableUntil = !isAvailable ? (selectedTime || defaultTime) : null;
+
+    if (!isAvailable && !selectedTime) {
+      alert('No restore time selected. Defaulting to 1 hour from now.');
+      setFoodUnavailableUntil((prev) => ({ ...prev, [foodId]: defaultTime }));
+    }
+
     setUpdatingFood(foodId);
+    setFoodMessage('');
+    setFoodError('');
+
     try {
-      const unavailableUntil = !isAvailable ? foodUnavailableUntil[foodId] : null;
-      await fetch(`${API}/admin-food-availability`, {
+      const res = await fetch(`${API}/admin-food-availability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
         body: JSON.stringify({ foodId, foodName, isAvailable, unavailableUntil }),
       });
-      await fetchFoodAvailability(key);
-    } catch { alert('Failed to update food availability.'); }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setFoodError(data?.error || 'Failed to update food availability.');
+      } else {
+        setFoodMessage('Food availability updated successfully.');
+        await fetchFoodAvailability(key);
+      }
+    } catch (err) {
+      setFoodError('Failed to update food availability.');
+    }
     setUpdatingFood(null);
   };
 
@@ -335,6 +364,11 @@ export default function Admin() {
 
         {tab === 'food' && (
           <div className="space-y-4">
+            {(foodError || foodMessage) && (
+              <div className={`rounded-3xl p-4 text-sm ${foodError ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+                {foodError || foodMessage}
+              </div>
+            )}
             {menuDataNoImages.length === 0 ? (
               <div className="bg-white rounded-3xl p-16 text-center shadow">
                 <p className="text-gray-500 text-lg">No food items available.</p>
@@ -369,20 +403,21 @@ export default function Admin() {
                       </div>
 
                       <div className="space-y-3">
-                        {!isAvailable && (
-                          <div>
-                            <label className="text-xs font-bold text-gray-600 block mb-2">Set available time</label>
-                            <input
-                              type="datetime-local"
-                              value={foodUnavailableUntil[food.id] || ''}
-                              onChange={(e) => setFoodUnavailableUntil({
-                                ...foodUnavailableUntil,
-                                [food.id]: e.target.value,
-                              })}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <label className="text-xs font-bold text-gray-600 block mb-2">Available again at</label>
+                          <input
+                            type="datetime-local"
+                            value={foodUnavailableUntil[food.id] || unavailableUntil || ''}
+                            onChange={(e) => setFoodUnavailableUntil({
+                              ...foodUnavailableUntil,
+                              [food.id]: e.target.value,
+                            })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            Pick a time to auto-enable this food when it becomes unavailable.
+                          </p>
+                        </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateFoodAvailability(food.id, food.name, !isAvailable)}

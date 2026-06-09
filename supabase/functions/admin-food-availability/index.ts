@@ -67,12 +67,24 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'POST') {
     const { foodId, foodName, isAvailable, unavailableUntil } = await req.json();
 
+    if (!foodId || typeof isAvailable !== 'boolean') {
+      return json({ error: 'Missing required foodId or availability state.' }, 400);
+    }
+
+    if (!isAvailable && !unavailableUntil) {
+      return json({ error: 'Please provide a valid unavailable-until datetime.' }, 400);
+    }
+
     // Check if record exists
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('food_availability')
       .select('id')
       .eq('food_id', foodId)
       .single();
+
+    if (existingError && existingError.code !== 'PGRST116') {
+      return json({ error: existingError.message }, 500);
+    }
 
     let result;
     if (existing) {
