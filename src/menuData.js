@@ -1,0 +1,28 @@
+import { MENU_IMAGE_URLS as I } from './menuImageUrls.js';
+
+export const menuDataNoImages = [
+  { id: 1, name: 'Amala', price: 300, desc: 'Per wrap', category: 'Swallow', available: true, image: I.amala },
+  { id: 2, name: 'Semo', price: 300, desc: 'Per wrap', category: 'Swallow', available: true, image: I.semo },
+  { id: 3, name: 'Eba', price: 300, desc: 'Per wrap', category: 'Swallow', available: true, image: I.eba },
+  { id: 4, name: 'Fufu', price: 300, desc: 'Per wrap', category: 'Swallow', available: true, image: I.fufu },
+  { id: 5, name: 'Large Pack', price: 10000, desc: 'Jollof rice, fried rice, cookies and juice', category: 'Xmas Combo', available: true, image: I.largePack },
+  { id: 6, name: 'Regular Pasta Pack', price: 10000, desc: 'Pasta, chicken and drink', category: 'Xmas Combo', available: true, image: I.pastaPack },
+  { id: 7, name: 'Regular Rice Pack', price: 7500, desc: 'Rice, chicken and drink', category: 'Xmas Combo', available: true, image: I.riceChickenCombo },
+  { id: 8, name: 'Pasta', price: 500, desc: 'Per portion', category: 'Rice Meals', available: true, image: I.pasta },
+  { id: 9, name: 'Yamatoes Porridge', price: 500, desc: 'A portion of yam + potato porridge', category: 'Rice Meals', available: true, image: I.yamPorridge },
+  { id: 10, name: 'Ewa Agoyin', price: 4000, desc: 'Agoyin beans with fried plantain fish', category: 'Rice Meals', available: true, image: I.ewaAgoyin },
+  { id: 11, name: 'Grandma\'s Rice', price: 400, desc: 'Rice and beans', category: 'Rice Meals', available: false, note: 'Out of stock until 11:59 PM', image: I.riceBeans },
+  { id: 12, name: 'Boiled Eggs', price: 400, desc: 'Boiled stewed eggs', category: 'Rice Meals', available: true, image: I.eggs },
+  { id: 13, name: 'Fried Rice', price: 400, desc: 'Fried rice', category: 'Rice Meals', available: true, image: I.friedRice },
+  { id: 14, name: 'Plantain', price: 500, desc: 'Fried plantain', category: 'Rice Meals', available: true, image: I.plantain },
+  { id: 15, name: 'Jollof Rice', price: 400, desc: 'Jollof rice', category: 'Rice Meals', available: true, image: I.jollof },
+  { id: 16, name: 'White Rice', price: 400, desc: 'Per portion', category: 'Rice Meals', available: true, image: I.whiteRice },
+  { id: 17, name: 'Grandma\'s Rice with Turkey or Chicken', price: 6500, desc: 'Combination of rice and beans cooked in the n...', category: 'Special Orders', available: true, image: I.riceBeansTurkey },
+  { id: 18, name: 'Thee Big Deal Porridge', price: 2000, desc: 'Yam and potato porridge with fried big sides', category: 'Special Orders', available: false, note: 'Out of stock', image: I.yamPorridge },
+  { id: 19, name: 'Grandma\'s Rice with Fried Fish', price: 2000, desc: 'Combination of rice and beans cooked in the t...', category: 'Special Orders', available: true, image: I.fish },
+  { id: 20, name: 'Noodles', price: 4000, desc: 'Instant noodles with veggies and chicken', category: 'Special Orders', available: true, image: I.noodles },
+  { id: 21, name: 'Thee Big Deal Porridge (Chicken)', price: 3000, desc: 'Yam & potato porridge with turkey or chicken', category: 'Special Orders', available: true, image: I.yamPorridgeChicken },
+  { id: 22, name: 'Standard Shawarma', price: 1500, desc: 'Standard shawarma', category: 'Wraps and goodies', available: false, image: I.shawarma },
+  { id: 23, name: 'Double Sausage Shawarma', price: 2000, desc: 'Double sausage shawarma', category: 'Wraps and goodies', available: false, image: I.beefShawarma },
+  { id: 24, name: 'Protein & Sides', price: 0, desc: 'Ask us for today\'s protein and side options', category: 'Protein and sides', available: true, image: I.proteinSides },
+];
